@@ -1,0 +1,532 @@
+/* ============ 后台管理样式 ============ */
+.admin-loading {
+	padding: 60px;
+	text-align: center;
+	color: #6b7280;
+}
+
+/* 登录页 */
+.admin-login-wrap {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, #0e3c6e, #14508c 60%, #2a6cb0);
+}
+
+.admin-login-card {
+	width: 360px;
+	background: #fff;
+	border-radius: 14px;
+	padding: 40px 36px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.admin-login-card h1 {
+	margin: 0 0 24px;
+	font-size: 22px;
+	text-align: center;
+	color: #14508c;
+}
+
+.admin-login-card label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: #374151;
+	margin: 14px 0 6px;
+}
+
+.admin-login-card input {
+	width: 100%;
+	padding: 10px 14px;
+	border: 1px solid #e5e9f0;
+	border-radius: 8px;
+	font-size: 14px;
+	outline: none;
+}
+
+.admin-login-card input:focus {
+	border-color: #14508c;
+}
+
+.admin-login-btn {
+	width: 100%;
+	margin-top: 22px;
+	padding: 11px;
+	border: 0;
+	border-radius: 8px;
+	background: #14508c;
+	color: #fff;
+	font-size: 15px;
+}
+
+.admin-login-btn:hover:not(:disabled) {
+	background: #0e3c6e;
+}
+
+.admin-login-btn:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.admin-err {
+	margin-top: 12px;
+	color: #c5221f;
+	font-size: 13px;
+}
+
+/* 布局 */
+.admin-layout {
+	display: flex;
+	min-height: 100vh;
+	background: #f3f5f9;
+}
+
+.admin-side {
+	width: 210px;
+	flex: none;
+	background: #10233c;
+	color: #c7d2e2;
+	display: flex;
+	flex-direction: column;
+	position: sticky;
+	top: 0;
+	height: 100vh;
+}
+
+.admin-brand {
+	font-size: 17px;
+	font-weight: 700;
+	color: #fff;
+	padding: 20px 18px;
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-brand-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	background: linear-gradient(135deg, #2f81f7, #14508c);
+}
+
+.admin-nav {
+	flex: 1;
+	padding: 12px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.admin-nav a {
+	padding: 10px 14px;
+	border-radius: 8px;
+	font-size: 14px;
+	color: #c7d2e2;
+}
+
+.admin-nav a:hover {
+	background: rgba(255, 255, 255, 0.07);
+	color: #fff;
+}
+
+.admin-nav a.on {
+	background: #14508c;
+	color: #fff;
+	font-weight: 600;
+}
+
+.admin-back {
+	margin-top: 10px;
+	opacity: 0.75;
+}
+
+.admin-side-foot {
+	padding: 14px 18px;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	font-size: 13px;
+}
+
+.admin-user {
+	margin-bottom: 8px;
+	color: #fff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.admin-logout {
+	width: 100%;
+	padding: 8px;
+	background: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 7px;
+	color: #c7d2e2;
+	font-size: 13px;
+}
+
+.admin-logout:hover {
+	border-color: #c5221f;
+	color: #ff8a80;
+}
+
+.admin-main {
+	flex: 1;
+	padding: 26px 30px;
+	min-width: 0;
+}
+
+.admin-page-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 18px;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.admin-page-head h2 {
+	margin: 0;
+	font-size: 20px;
+	color: #1f2937;
+}
+
+/* 按钮 */
+.btn {
+	padding: 8px 18px;
+	border: 1px solid #d7dce5;
+	border-radius: 8px;
+	background: #fff;
+	font-size: 14px;
+	color: #374151;
+}
+
+.btn:hover {
+	border-color: #14508c;
+	color: #14508c;
+}
+
+.btn.primary {
+	background: #14508c;
+	border-color: #14508c;
+	color: #fff;
+}
+
+.btn.primary:hover {
+	background: #0e3c6e;
+	color: #fff;
+}
+
+.btn.danger {
+	color: #c5221f;
+}
+
+.btn.danger:hover {
+	border-color: #c5221f;
+	background: #fdecea;
+}
+
+.btn.small {
+	padding: 4px 12px;
+	font-size: 13px;
+}
+
+.btn:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+/* 表格 */
+.admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+	border-radius: 10px;
+	overflow: hidden;
+	box-shadow: 0 1px 4px rgba(16, 35, 60, 0.06);
+	font-size: 14px;
+}
+
+.admin-table th {
+	text-align: left;
+	padding: 11px 14px;
+	background: #f8fafc;
+	color: #6b7280;
+	font-weight: 600;
+	font-size: 13px;
+	border-bottom: 1px solid #eef1f6;
+	white-space: nowrap;
+}
+
+.admin-table td {
+	padding: 10px 14px;
+	border-bottom: 1px solid #f1f4f8;
+	vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+	border-bottom: 0;
+}
+
+.admin-table .cell-title {
+	max-width: 320px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.admin-table .muted {
+	color: #9aa4b2;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.badge {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 10px;
+	font-size: 12px;
+	background: #eef1f6;
+	color: #6b7280;
+}
+
+.badge.on {
+	background: #e3f4e8;
+	color: #1a7f37;
+}
+
+.badge.off {
+	background: #fdecea;
+	color: #c5221f;
+}
+
+/* 表单/弹层 */
+.admin-panel {
+	background: #fff;
+	border-radius: 10px;
+	padding: 22px;
+	box-shadow: 0 1px 4px rgba(16, 35, 60, 0.06);
+	margin-bottom: 20px;
+}
+
+.admin-field {
+	margin-bottom: 14px;
+}
+
+.admin-field label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: #374151;
+	margin-bottom: 5px;
+}
+
+.admin-field input,
+.admin-field textarea,
+.admin-field select {
+	width: 100%;
+	padding: 9px 12px;
+	border: 1px solid #e0e5ee;
+	border-radius: 8px;
+	font-size: 14px;
+	outline: none;
+	background: #fff;
+}
+
+.admin-field input:focus,
+.admin-field textarea:focus,
+.admin-field select:focus {
+	border-color: #14508c;
+}
+
+.admin-field textarea {
+	min-height: 120px;
+	resize: vertical;
+}
+
+.admin-field .hint {
+	font-size: 12px;
+	color: #9aa4b2;
+	margin-top: 4px;
+}
+
+.admin-row {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.admin-row .admin-field {
+	flex: 1;
+	min-width: 180px;
+}
+
+.admin-msg {
+	padding: 10px 14px;
+	border-radius: 8px;
+	font-size: 14px;
+	margin-bottom: 14px;
+}
+
+.admin-msg.ok {
+	background: #e3f4e8;
+	color: #1a7f37;
+}
+
+.admin-msg.err {
+	background: #fdecea;
+	color: #c5221f;
+}
+
+/* tabs */
+.admin-tabs {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	margin-bottom: 16px;
+}
+
+.admin-tabs button {
+	padding: 7px 16px;
+	border: 1px solid #d7dce5;
+	border-radius: 18px;
+	background: #fff;
+	font-size: 13px;
+	color: #374151;
+}
+
+.admin-tabs button:hover {
+	border-color: #14508c;
+	color: #14508c;
+}
+
+.admin-tabs button.on {
+	background: #14508c;
+	border-color: #14508c;
+	color: #fff;
+}
+
+/* 弹框 */
+.modal-mask {
+	position: fixed;
+	inset: 0;
+	background: rgba(16, 35, 60, 0.45);
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 6vh 16px;
+	z-index: 200;
+	overflow: auto;
+}
+
+.modal {
+	width: min(860px, 100%);
+	background: #fff;
+	border-radius: 12px;
+	padding: 24px;
+	box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+}
+
+.modal h3 {
+	margin: 0 0 18px;
+	font-size: 17px;
+	color: #1f2937;
+}
+
+.modal-foot {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 18px;
+}
+
+.empty-tip {
+	padding: 40px;
+	text-align: center;
+	color: #9aa4b2;
+	font-size: 14px;
+	background: #fff;
+	border-radius: 10px;
+}
+
+/* 图片上传 */
+.upload-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 14px;
+}
+
+.upload-item {
+	background: #fff;
+	border: 1px solid #e5e9f0;
+	border-radius: 10px;
+	overflow: hidden;
+	position: relative;
+}
+
+.upload-item img {
+	width: 100%;
+	height: 110px;
+	object-fit: cover;
+	background: #f5f7fa;
+}
+
+.upload-item .info {
+	padding: 8px 10px;
+	font-size: 12px;
+	color: #6b7280;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.upload-item .del {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 26px;
+	height: 26px;
+	border: 0;
+	border-radius: 6px;
+	background: rgba(197, 34, 31, 0.9);
+	color: #fff;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.upload-drop {
+	border: 2px dashed #c9d4e3;
+	border-radius: 12px;
+	padding: 30px;
+	text-align: center;
+	color: #6b7280;
+	font-size: 14px;
+	background: #fff;
+	margin-bottom: 18px;
+	cursor: pointer;
+}
+
+.upload-drop:hover {
+	border-color: #14508c;
+	color: #14508c;
+}
+
+@media (max-width: 800px) {
+	.admin-layout {
+		flex-direction: column;
+	}
+
+	.admin-side {
+		width: 100%;
+		height: auto;
+		position: static;
+	}
+
+	.admin-nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+}

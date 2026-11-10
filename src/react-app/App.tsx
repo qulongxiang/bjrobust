@@ -1,66 +1,35 @@
-// src/App.tsx
+// 应用路由：前台页面 + 后台管理（/admin）
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "./components/Layout";
+import AdminApp from "./admin/AdminApp";
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
+import News from "./pages/News";
+import NewsDetail from "./pages/NewsDetail";
+import Cases from "./pages/Cases";
+import CaseDetail from "./pages/CaseDetail";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import "./styles.css";
 
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import cloudflareLogo from "./assets/Cloudflare_Logo.svg";
-import honoLogo from "./assets/hono.svg";
-import "./App.css";
-
-function App() {
-	const [count, setCount] = useState(0);
-	const [name, setName] = useState("unknown");
-
+export default function App() {
 	return (
-		<>
-			<div>
-				<a href="https://vite.dev" target="_blank">
-					<img src={viteLogo} className="logo" alt="Vite logo" />
-				</a>
-				<a href="https://react.dev" target="_blank">
-					<img src={reactLogo} className="logo react" alt="React logo" />
-				</a>
-				<a href="https://hono.dev/" target="_blank">
-					<img src={honoLogo} className="logo cloudflare" alt="Hono logo" />
-				</a>
-				<a href="https://workers.cloudflare.com/" target="_blank">
-					<img
-						src={cloudflareLogo}
-						className="logo cloudflare"
-						alt="Cloudflare logo"
-					/>
-				</a>
-			</div>
-			<h1>Vite + React + Hono + Cloudflare</h1>
-			<div className="card">
-				<button
-					onClick={() => setCount((count) => count + 1)}
-					aria-label="increment"
-				>
-					count is {count}
-				</button>
-				<p>
-					Edit <code>src/App.tsx</code> and save to test HMR
-				</p>
-			</div>
-			<div className="card">
-				<button
-					onClick={() => {
-						fetch("/api/")
-							.then((res) => res.json() as Promise<{ name: string }>)
-							.then((data) => setName(data.name));
-					}}
-					aria-label="get name"
-				>
-					Name from API is: {name}
-				</button>
-				<p>
-					Edit <code>worker/index.ts</code> to change the name
-				</p>
-			</div>
-			<p className="read-the-docs">Click on the logos to learn more</p>
-		</>
+		<BrowserRouter>
+			<Routes>
+				<Route path="/admin/*" element={<AdminApp />} />
+				<Route element={<Layout />}>
+					<Route path="/" element={<Home />} />
+					<Route path="/products" element={<Products />} />
+					<Route path="/products/:id" element={<ProductDetail />} />
+					<Route path="/news" element={<News />} />
+					<Route path="/news/:id" element={<NewsDetail />} />
+					<Route path="/cases" element={<Cases />} />
+					<Route path="/cases/:id" element={<CaseDetail />} />
+					<Route path="/about" element={<About />} />
+					<Route path="/contact" element={<Contact />} />
+				</Route>
+			</Routes>
+		</BrowserRouter>
 	);
 }
-
-export default App;
