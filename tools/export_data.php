@@ -5,9 +5,12 @@ $pdo = new PDO("mysql:host=172.16.20.243;port=24306;dbname=bjrobust;charset=utf8
 ]);
 
 function mapType(string $mysqlType): string {
-    $t = strtolower($mysqlType);
-    if (strpos($t, 'int') === 0) return 'INTEGER';
-    if (strpos($t, 'float') === 0 || strpos($t, 'double') === 0 || strpos($t, 'decimal') === 0) return 'REAL';
+    // 取基础类型（去掉长度/精度括号）：int(11)/tinyint(1)/decimal(10,2) → int/tinyint/decimal
+    $base = preg_split('/[\s(]/', strtolower(trim($mysqlType)), 2)[0];
+    $intTypes = ['int', 'integer', 'tinyint', 'smallint', 'mediumint', 'bigint'];
+    $realTypes = ['float', 'double', 'decimal', 'real', 'numeric'];
+    if (in_array($base, $intTypes, true)) return 'INTEGER';
+    if (in_array($base, $realTypes, true)) return 'REAL';
     return 'TEXT';
 }
 
@@ -37,7 +40,11 @@ foreach ($tables as $t) {
         $line = [];
         foreach ($colMeta as $cm) {
             $v = $r[$cm['name']];
-            if ($v !== null && $cm['sqlite'] !== 'TEXT' && is_numeric($v)) $v = (int)$v;
+            if ($v !== null && is_numeric($v)) {
+                // 按目标类型规整：整型列去掉浮点尾巴（tinyint 值可能以 float 返回），文本列保留原值
+                if ($cm['sqlite'] === 'INTEGER') $v = (int)$v;
+                elseif ($cm['sqlite'] === 'REAL') $v = (float)$v;
+            }
             $line[] = $v;
         }
         $rowArr[] = $line;
