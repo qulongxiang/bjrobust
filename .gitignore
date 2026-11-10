@@ -197,3 +197,7 @@ dist
 !.env.example
 .dev.vars*
 !.dev.vars.example
+
+### 迁移产物（可用 tools/ 脚本重新生成；data.json 含站点数据，不入仓库） ###
+migrate.sql
+tools/data.json
