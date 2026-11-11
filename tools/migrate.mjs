@@ -5,6 +5,7 @@
 //                                  CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID / D1_DATABASE_ID）
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
+import { execSync } from "node:child_process";
 import path from "node:path";
 
 const mode = process.argv[2] || "local";
@@ -34,22 +35,63 @@ if (mode === "local") {
 	db.exec("COMMIT");
 	console.log("本地迁移完成");
 } else if (mode === "remote") {
-	const token = process.env.CLOUDFLARE_API_TOKEN;
-	const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-	const databaseId = process.env.D1_DATABASE_ID;
-	if (!token || !accountId || !databaseId) {
-		console.error("remote 模式需要环境变量: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, D1_DATABASE_ID");
-		process.exit(1);
-	}
-	const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
-	const post = async (sql, params) => {
-		const res = await fetch(url, {
-			method: "POST",
-			headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-			body: JSON.stringify({ sql, params: params ?? [] }),
-		});
-		if (!res.ok) throw new Error(`D1 API ${res.status}: ${(await res.text()).slice(0, 300)}`);
-	};
+ const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+ const databaseId = process.env.D1_DATABASE_ID;
+ // OAuth 访问令牌有效期短：优先每次请求时从 wrangler 凭据文件读最新值；401/403 时触发 wrangler 刷新
+ const tomlPath =
+  process.env.WRANGLER_TOKEN_TOML || "C:/Users/qlx/AppData/Roaming/xdg.config/.wrangler/config/default.toml";
+ const readToken = () => {
+  try {
+   const m = readFileSync(tomlPath, "utf8").match(/oauth_token\s*=\s*"([^"]+)"/);
+   return m ? m[1] : null;
+  } catch {
+   return null;
+  }
+ };
+ const refreshToken = () => {
+  try {
+   execSync("npx wrangler whoami", { stdio: "ignore", timeout: 90_000 });
+  } catch {
+   /* 刷新失败则沿用旧 token，由重试循环兜底 */
+  }
+ };
+ const token = process.env.CLOUDFLARE_API_TOKEN || readToken();
+ if (!token || !accountId || !databaseId) {
+  console.error("remote 模式需要凭据: CLOUDFLARE_API_TOKEN 环境变量或 wrangler 登录（凭据文件）, CLOUDFLARE_ACCOUNT_ID, D1_DATABASE_ID");
+  process.exit(1);
+ }
+ const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
+ const post = async (sql, params) => {
+  // 网络到 CF API 可能不稳定：30s 超时 + 最多 5 次退避重试（INSERT OR REPLACE 幂等，重试安全）
+  let lastErr;
+  for (let attempt = 0; attempt < 5; attempt++) {
+   try {
+    const t = readToken() || token; // 每次取最新 token
+    const res = await fetch(url, {
+     method: "POST",
+     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+     body: JSON.stringify({ sql, params: params ?? [] }),
+     signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+     const msg = `D1 API ${res.status}: ${(await res.text()).slice(0, 300)}`;
+     if (res.status === 401 || res.status === 403) {
+      refreshToken(); // 令牌过期：刷新后重试
+      lastErr = new Error(msg);
+     } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+      throw new Error(msg); // 其他 4xx 重试无意义
+     } else lastErr = new Error(msg);
+    } else return;
+   } catch (e) {
+    if (e.message.startsWith("D1 API 4")) throw e;
+    lastErr = e;
+   }
+   const wait = 2000 * (attempt + 1);
+   console.error(`  请求失败（${String(lastErr).slice(0, 80)}），${wait / 1000}s 后重试 ${attempt + 1}/4…`);
+   await new Promise((r) => setTimeout(r, wait));
+  }
+  throw lastErr;
+ };
 	for (const t of data.tables) {
 		await post(t.ddl);
 		for (const idx of t.indexes) await post(idx);
