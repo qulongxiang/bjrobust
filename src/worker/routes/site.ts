@@ -387,12 +387,14 @@ function contentTypeOf(key: string, fallback?: string): string {
 
 export const assetsApp = new Hono<{ Bindings: AppEnv }>();
 assetsApp.get("/*", async (c) => {
+	const bucket = c.env.IMAGES;
+	if (!bucket) return c.notFound(); // R2 未开通
 	let key = c.req.path.replace(/^\/assets\//, "");
 	if (!key) return c.notFound();
-	let obj = await c.env.IMAGES.get(key);
+	let obj = await bucket.get(key);
 	// 兼容库内裸文件名（无 upload/ 前缀）
 	if (!obj && !key.startsWith("upload/")) {
-		obj = await c.env.IMAGES.get("upload/" + key);
+		obj = await bucket.get("upload/" + key);
 		key = "upload/" + key;
 	}
 	if (!obj) return c.notFound();

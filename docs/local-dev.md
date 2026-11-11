@@ -86,16 +86,44 @@ JWT_SECRET=...   # 本地会话签名密钥，生产必须换成随机值（wran
 
 ## 生产部署（Cloudflare 账号操作）
 
+当前生产状态（2026-11-11 起）：**已上线，未接 R2**。D1 数据已灌完，Worker 正常；
+`wrangler.json` 里的 R2 绑定已临时移除，图片接口 404，前端显示灰色占位图（main.tsx 顶部）。
+
+### 初始部署步骤（已完成，留档）
+
 ```bash
 npx wrangler login                      # 浏览器 OAuth 登录
 npx wrangler d1 create bjrobust-db      # 记下输出的 database_id，填回 wrangler.json
-npx wrangler r2 bucket create bjrobust-images
 node tools/migrate.mjs remote           # 灌数据（用上面导出的最新 data.json）
-# 历史图片上传到生产 R2：可用 wrangler r2 object put 或图片库后台逐个上传
 npx wrangler secret put JWT_SECRET      # 输入随机长字符串
 npm run build                           # 产出 dist/client + dist/worker
 npx wrangler deploy
 ```
+
+### 恢复 R2（账号开通 R2 后执行）
+
+```bash
+# 1) dashboard 开通 R2（免费计划即可）
+# 2) 建桶
+npx wrangler r2 bucket create bjrobust-images
+# 3) 在 wrangler.json 的 d1_databases 之后加回绑定：
+#    "r2_buckets": [ { "binding": "IMAGES", "bucket_name": "bjrobust-images" } ]
+# 4) 重新生成类型（env.ts 里可用生成的 R2Bucket 替换 R2BucketLike）
+npx wrangler types && npx tsc -b
+# 5) 推送 547 张历史图片（token 从 wrangler 凭据读取，勿打印）
+TOKEN=$(grep -oP 'oauth_token\s*=\s*"\K[^"]+' "$HOME/AppData/Roaming/xdg.config/.wrangler/config/default.toml" | head -1)
+CLOUDFLARE_API_TOKEN="$TOKEN" CLOUDFLARE_ACCOUNT_ID=ea1fab4be92f6b0809efef4bd03c5341 \
+  node tools/r2_push_remote.mjs
+# 6) 重新构建部署（可选：同时删掉 main.tsx 里的占位图逻辑）
+npm run build && npx wrangler deploy
+```
+
+### 本机网络备注
+
+- GitHub SSH 22 端口被封，已配 `~/.ssh/config` 走 `ssh.github.com:443`
+- `*.workers.dev` 的出口 IP 本机 TCP 直连超时（CF 官方端点正常）；
+  验证线上运行时可用 `npx wrangler dev --remote`（本地 worker + 生产 D1），
+  或从其他网络（如手机流量）访问 workers.dev 地址；长期方案建议绑定自己的域名
 
 ## 代码结构
 

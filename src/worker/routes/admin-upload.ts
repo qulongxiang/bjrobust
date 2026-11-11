@@ -15,6 +15,7 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const PREFIX = "upload/";
 
 app.post("/upload", async (c) => {
+	if (!c.env.IMAGES) return c.json({ error: "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定" }, 503);
 	const form = await c.req.formData().catch(() => null);
 	if (!form) return c.json({ error: "请求格式错误" }, 400);
 	const file = form.get("file");
@@ -36,6 +37,7 @@ app.post("/upload", async (c) => {
 });
 
 app.get("/upload/list", async (c) => {
+	if (!c.env.IMAGES) return c.json({ error: "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定" }, 503);
 	const objects = await c.env.IMAGES.list({ prefix: PREFIX, limit: 200 });
 	const items = objects.objects.map((o) => ({
 		key: o.key,
@@ -48,6 +50,7 @@ app.get("/upload/list", async (c) => {
 });
 
 app.delete("/upload", async (c) => {
+	if (!c.env.IMAGES) return c.json({ error: "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定" }, 503);
 	const path = c.req.query("path") ?? "";
 	if (!path.startsWith(PREFIX)) return c.json({ error: "路径不合法" }, 400);
 	const key = path.replace(/^\//, "");
