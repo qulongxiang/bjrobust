@@ -15,6 +15,11 @@ document.addEventListener(
 		const t = e.target as HTMLImageElement | null;
 		if (t && t.tagName === "IMG" && !t.dataset.ph) {
 			t.dataset.ph = "1";
+			// 数据库内容里的空 src 图片（如页脚备案图标占位）：直接移除，不显示占位块
+			if (!t.getAttribute("src")) {
+				t.remove();
+				return;
+			}
 			t.src = PLACEHOLDER;
 		}
 	},

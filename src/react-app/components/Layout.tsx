@@ -54,13 +54,27 @@ export default function Layout() {
 				<Outlet />
 			</main>
 
+			{/* 页脚：还原旧站三栏（底部版权 / 首页联系方式 / 二维码），配色见 index.css */}
 			<footer className="site-footer">
-				<div className="container">
-					<div
-						className="footer-copy"
-						dangerouslySetInnerHTML={{ __html: fragments["底部版权"] || "" }}
-					/>
-					{g?.beian ? <div className="footer-beian">{g.beian}</div> : null}
+				<div className="container footer-inner">
+					<div className="footer-col footer-left">
+						<div
+							className="footer-copy"
+							dangerouslySetInnerHTML={{ __html: fragments["底部版权"] || "" }}
+						/>
+					</div>
+					{fragments["首页联系方式"] ? (
+						<div
+							className="footer-col footer-contact"
+							dangerouslySetInnerHTML={{ __html: fragments["首页联系方式"] }}
+						/>
+					) : null}
+					{fragments["二维码"] ? (
+						<div
+							className="footer-col footer-qr"
+							dangerouslySetInnerHTML={{ __html: fragments["二维码"] }}
+						/>
+					) : null}
 				</div>
 			</footer>
 		</div>
