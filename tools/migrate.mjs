@@ -13,11 +13,18 @@ const data = JSON.parse(readFileSync(new URL("./data.json", import.meta.url), "u
 
 if (mode === "local") {
 	const dir = path.join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
-	const files = readdirSync(dir).filter((f) => f.endsWith(".sqlite"));
+	// D1 配置（如 database_id）变更后 miniflare 会新建本地库文件：排除 metadata，取最近更新的
+	const { statSync } = await import("node:fs");
+	const files = readdirSync(dir)
+		.filter((f) => f.endsWith(".sqlite") && !f.startsWith("metadata"))
+		.map((f) => [f, statSync(path.join(dir, f)).mtimeMs])
+		.sort((a, b) => b[1] - a[1])
+		.map((f) => f[0]);
 	if (!files.length) {
 		console.error("未找到本地 D1 库文件，请先运行: npx wrangler d1 execute bjrobust-db --local --command 'SELECT 1'");
 		process.exit(1);
 	}
+	if (files.length > 1) console.log(`注意: 存在 ${files.length} 个本地 D1 文件，使用最近更新的: ${files[0]}`);
 	const dbFile = path.join(dir, files[0]);
 	console.log("库文件:", dbFile);
 	const db = new DatabaseSync(dbFile);

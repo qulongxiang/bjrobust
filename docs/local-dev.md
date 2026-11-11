@@ -61,6 +61,21 @@ node tools/r2_import.mjs
 `/assets/<文件名>` 会自动回退尝试 `upload/<文件名>`；富文本里的
 `/upload/xxx.jpg` 会由前端统一转成 `/assets/upload/xxx.jpg`。
 
+## 常见问题：页面有壳但 API 全部 500（no such table）
+
+本地 dev 的 D1 库文件按配置哈希命名。一旦改动 `wrangler.json` 的 D1 配置
+（典型场景：把占位 `database_id` 改成生产 ID），miniflare 重启后会**新建一个空的本地库文件**，
+旧数据文件被晾在一边，表现就是页面能打开但所有接口 500。
+
+处理（工具脚本已能自动选对文件）：
+
+```bash
+# 停 dev 后执行
+node tools/reset_local_db.mjs   # 会自动使用最近更新的 D1 文件
+npm run dev
+# 多余的旧库文件可在 .wrangler/state/v3/d1/miniflare-D1DatabaseObject/ 里删除
+```
+
 ## 本地开发密钥
 
 `.dev.vars`（已在 .gitignore）：

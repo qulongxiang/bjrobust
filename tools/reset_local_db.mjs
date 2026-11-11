@@ -2,7 +2,7 @@
 // 流程：清空全部表 → 从 tools/data.json 重新导入 → 重置本地测试管理员密码
 // 用法: node tools/reset_local_db.mjs [测试密码]   （默认 Bjrobust@2026）
 import { DatabaseSync } from "node:sqlite";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 
@@ -10,12 +10,20 @@ const PROJECT = "D:/softdata/text/bjrobust";
 const TEST_PASSWORD = process.argv[2] || "Bjrobust@2026";
 
 const dir = path.join(PROJECT, ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
-const f = readdirSync(dir).find((x) => x.endsWith(".sqlite") && !x.startsWith("metadata"));
-if (!f) {
+// D1 配置（如 database_id）变更后 miniflare 会新建本地库文件：取最近更新的为当前 dev 所用文件
+const dataFiles = readdirSync(dir)
+	.filter((x) => x.endsWith(".sqlite") && !x.startsWith("metadata"))
+	.map((x) => [x, statSync(path.join(dir, x)).mtimeMs])
+	.sort((a, b) => b[1] - a[1]);
+if (!dataFiles.length) {
 	console.error("未找到本地 D1 文件，请先运行一次: npm run dev（Ctrl+C 停止后再执行本脚本）");
 	process.exit(1);
 }
-const dbFile = path.join(dir, f);
+if (dataFiles.length > 1) {
+	console.log(`注意: 存在 ${dataFiles.length} 个本地 D1 文件，使用最近更新的: ${dataFiles[0][0]}`);
+	console.log("其余为配置变更留下的旧库文件，确认无用后可直接删除。");
+}
+const dbFile = path.join(dir, dataFiles[0][0]);
 const db = new DatabaseSync(dbFile);
 
 // 1) 清空全部表
