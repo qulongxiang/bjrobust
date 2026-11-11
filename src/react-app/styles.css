@@ -193,6 +193,19 @@
 	background: #fff;
 }
 
+/* 横幅渐变上叠加一层柔光，无图时也不显单调 */
+.hero::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(ellipse at 72% 18%, rgba(255, 255, 255, 0.16), transparent 55%);
+	pointer-events: none;
+}
+
+.hero-dots {
+	z-index: 2;
+}
+
 /* ============ 公司简介（首页） ============ */
 .about-box {
 	display: grid;
@@ -681,6 +694,30 @@
 	text-align: center;
 	color: var(--text-light);
 	font-size: 14px;
+}
+
+/* ============ 图片缺失占位（R2 未开通期间的观感处理） ============ */
+/* 横幅图缺失：直接隐藏，露出渐变底（比放大的灰块自然） */
+.hero-slide img.img-ph {
+	display: none;
+}
+
+/* 页脚二维码缺失：降透明度，深色底上不刺眼 */
+.footer-qr img.img-ph {
+	opacity: 0.4;
+}
+
+/* 正文/静态页里的缺失图：缩小，不占大块灰 */
+.rich img.img-ph,
+.static-page img.img-ph {
+	max-width: 180px;
+	max-height: 120px;
+}
+
+/* 产品卡/详情主图缺失：背景换成更柔和的渐变 */
+.product-card .pic:has(img.img-ph),
+.gallery .main-pic:has(img.img-ph) {
+	background: linear-gradient(135deg, #f2f5f9, #e9edf3);
 }
 
 /* ============ 响应式 ============ */
