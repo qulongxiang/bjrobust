@@ -15,8 +15,14 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "bjrobust-db",
+			"database_name": "bjrobust",
 			"database_id": "d2e1886b-2684-4774-b97d-6925446b5b3b"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "IMAGES",
+			"bucket_name": "bjrobust"
 		}
 	]
 }

@@ -1,5 +1,5 @@
 // tools/r2_push_remote.mjs — 把原站 upload/ 目录批量推送到生产 R2
-// 前提：账号已开通 R2 且桶 bjrobust-images 已创建（npx wrangler r2 bucket create bjrobust-images）
+// 前提：账号已开通 R2 且桶 bjrobust 已创建（npx wrangler r2 bucket create bjrobust）
 // 用法: CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... node tools/r2_push_remote.mjs
 // Windows: 先 set 两个变量再执行
 import { readdirSync, readFileSync } from "node:fs";
@@ -7,7 +7,7 @@ import path from "node:path";
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-const BUCKET = "bjrobust-images";
+const BUCKET = "bjrobust";
 const ROOT = "D:/softdata/text/php-scripts/upload";
 const MIME = {
 	".jpg": "image/jpeg",
@@ -33,7 +33,8 @@ const files = [];
 files.sort();
 console.log("待上传:", files.length, "个文件");
 
-const base = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/bucket/${BUCKET}`;
+// 注意：对象操作路径必须带 /objects/ 段
+const base = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/${BUCKET}/objects`;
 let idx = 0;
 let okCount = 0;
 
