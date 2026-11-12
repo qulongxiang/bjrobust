@@ -14,6 +14,9 @@ export type HomeData = {
 	banners: { id: number; title: string; pic: string; noteTime: string }[];
 	news: { id: number; title: string; noteTime: string; pic: string; hits: number }[];
 	products: { id: number; name: string; pic: string; noteTime: string }[];
+	cases: { id: number; title: string; pic: string }[];
+	brands: { id: number; title: string; pic: string; link: string }[];
+	partners: { id: number; title: string; pic: string; link: string }[];
 };
 
 export type GlobalData = { global: GlobalInfo; fragments: Record<string, string> };

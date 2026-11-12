@@ -1,4 +1,4 @@
-// 首页：横幅轮播 + 公司简介 + 最新新闻 + 推荐产品
+// 首页：纯图 banner 轮播 + 各栏目带图（还原旧 PHP 站排版）
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, imgUrl, type HomeData } from "../api";
@@ -13,30 +13,24 @@ export default function Home() {
 
 	useEffect(() => {
 		if (!d || d.banners.length < 2) return;
-		const t = setInterval(() => setSlide((s) => (s + 1) % d.banners.length), 5000);
+		const t = setInterval(() => setSlide((s) => (s + 1) % d.banners.length), 6000);
 		return () => clearInterval(t);
 	}, [d]);
 
 	if (!d) return <div className="empty">加载中…</div>;
 
-	const siteName = d.global?.webname && d.global.webname !== "网站名称" ? d.global.webname : d.global?.title || "";
-
 	return (
 		<>
-			{/* 横幅 */}
+			{/* banner：纯图轮播（无文字压图），6 秒自动切换 */}
 			<div className="hero">
-				{d.banners.length ? (
-					d.banners.map((b, i) => (
-						<div key={b.id} className={`hero-slide ${i === slide ? "on" : ""}`}>
-							{b.pic ? <img src={imgUrl(b.pic)} alt={b.title} /> : null}
-							<div className="hero-text">{b.title || siteName}</div>
-						</div>
-					))
-				) : (
-					<div className="hero-slide on">
-						<div className="hero-text">{siteName}</div>
-					</div>
-				)}
+				{d.banners.map((b, i) => (
+					<img
+						key={b.id}
+						src={imgUrl(b.pic)}
+						alt={b.title}
+						className={`hero-img ${i === slide ? "on" : ""}`}
+					/>
+				))}
 				{d.banners.length > 1 ? (
 					<div className="hero-dots">
 						{d.banners.map((b, i) => (
@@ -51,91 +45,119 @@ export default function Home() {
 				) : null}
 			</div>
 
-			{/* 公司简介 */}
-			{d.about ? (
-				<section className="section">
-					<div className="container">
-						<div className="section-head">
-							<h2 className="section-title">关于我们</h2>
-							<Link className="section-more" to="/about">
-								了解更多 →
-							</Link>
-						</div>
-						<div
-							className="rich about-text"
-							dangerouslySetInnerHTML={{ __html: d.about }}
-						/>
+			{/* 主体：左产品中心 / 右各栏目（还原旧站两栏） */}
+			<div className="container home-center">
+				<section className="home-main">
+					<div className="side-title">
+						<span>产品中心</span>
+						<Link className="mores" to="/products">MORE+</Link>
 					</div>
-				</section>
-			) : null}
-
-			{/* 最新新闻 */}
-			<section className="section section-alt">
-				<div className="container">
-					<div className="section-head">
-						<h2 className="section-title">新闻中心</h2>
-						<Link className="section-more" to="/news">
-							全部新闻 →
-						</Link>
-					</div>
-					<div className="news-grid">
-						<div className="news-list">
-							{d.news.slice(0, 5).map((n) => (
-								<div className="news-row" key={n.id}>
-									<span className="date">{n.noteTime.slice(0, 10)}</span>
-									<Link className="title" to={`/news/${n.id}`}>
-										{n.title}
-									</Link>
-									<span className="arrow">›</span>
+					<div className="home-pro-grid">
+						{d.products.map((p) => (
+							<Link className="home-pro" to={`/products/${p.id}`} key={p.id}>
+								<div className="pic">
+									{p.pic ? <img src={imgUrl(p.pic)} alt={p.name} loading="lazy" /> : null}
 								</div>
-							))}
-							{!d.news.length ? <div className="empty">暂无新闻</div> : null}
-						</div>
-						<div className="news-side">
-							<h4>推荐产品</h4>
-							{d.products.slice(0, 5).map((p) => (
-								<Link
-									key={p.id}
-									to={`/products/${p.id}`}
-									className="news-row"
-									style={{ padding: "9px 0" }}
-								>
-									<span className="title">{p.name}</span>
-									<span className="arrow">›</span>
-								</Link>
-							))}
-							{!d.products.length ? <div className="empty">暂无产品</div> : null}
-						</div>
-					</div>
-				</div>
-			</section>
-
-			{/* 推荐产品 */}
-			{d.products.length ? (
-				<section className="section">
-					<div className="container">
-						<div className="section-head">
-							<h2 className="section-title">产品中心</h2>
-							<Link className="section-more" to="/products">
-								全部产品 →
+								<div className="name">{p.name}</div>
 							</Link>
-						</div>
-						<div className="product-grid">
-							{d.products.map((p) => (
-								<Link className="product-card" to={`/products/${p.id}`} key={p.id}>
-									<div className="pic">
-										{p.pic ? <img src={imgUrl(p.pic)} alt={p.name} loading="lazy" /> : null}
-									</div>
-									<div className="body">
-										<div className="name">{p.name}</div>
-										<div className="time">{p.noteTime.slice(0, 10)}</div>
-									</div>
-								</Link>
-							))}
-						</div>
+						))}
+						{!d.products.length ? <div className="empty">暂无产品</div> : null}
 					</div>
 				</section>
-			) : null}
+
+				<aside className="home-side">
+					{d.about ? (
+						<section className="home-block">
+							<div className="side-title">
+								<span>公司概况</span>
+								<Link className="mores" to="/about">MORE+</Link>
+							</div>
+							<div className="about-brief" dangerouslySetInnerHTML={{ __html: d.about }} />
+						</section>
+					) : null}
+
+					{d.cases.length ? (
+						<section className="home-block">
+							<div className="side-title">
+								<span>成功案例</span>
+								<Link className="mores" to="/cases">MORE+</Link>
+							</div>
+							<div className="case-grid">
+								{d.cases.slice(0, 4).map((c) => (
+									<Link to={`/cases/${c.id}`} key={c.id} className="case-item">
+										<img src={imgUrl(c.pic)} alt={c.title} loading="lazy" />
+										<div className="name">{c.title}</div>
+									</Link>
+								))}
+							</div>
+						</section>
+					) : null}
+
+					{d.news.length ? (
+						<section className="home-block">
+							<div className="side-title">
+								<span>新闻活动</span>
+								<Link className="mores" to="/news">MORE+</Link>
+							</div>
+							<ul className="news-brief">
+								{d.news.slice(0, 5).map((n) => (
+									<li key={n.id}>
+										<span className="dot" />
+										<Link to={`/news/${n.id}`}>{n.title}</Link>
+										<span className="date">{n.noteTime.slice(0, 10)}</span>
+									</li>
+								))}
+							</ul>
+						</section>
+					) : null}
+
+					{d.brands.length ? (
+						<section className="home-block">
+							<div className="side-title">
+								<span>代理品牌</span>
+								<Link className="mores" to="/news?type=6">MORE+</Link>
+							</div>
+							<div className="brand-grid">
+								{d.brands.map((b) => (
+									<a
+										key={b.id}
+										href={b.link || "#"}
+										target="_blank"
+										rel="noreferrer"
+										className="brand-item"
+										title={b.title}
+									>
+										<img src={imgUrl(b.pic)} alt={b.title} loading="lazy" />
+									</a>
+								))}
+							</div>
+						</section>
+					) : null}
+
+					{d.partners.length ? (
+						<section className="home-block">
+							<div className="side-title">
+								<span>合作伙伴</span>
+								<Link className="mores" to="/news?type=7">MORE+</Link>
+							</div>
+							<div className="partner-grid">
+								{d.partners.slice(0, 9).map((p) => (
+									<a
+										key={p.id}
+										href={p.link || "#"}
+										target="_blank"
+										rel="noreferrer"
+										className="partner-item"
+										title={p.title}
+									>
+										<img src={imgUrl(p.pic)} alt={p.title} loading="lazy" />
+									</a>
+								))}
+							</div>
+						</section>
+					) : null}
+				</aside>
+			</div>
 		</>
 	);
 }

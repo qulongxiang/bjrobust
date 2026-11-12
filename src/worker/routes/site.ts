@@ -101,6 +101,15 @@ app.get("/home", async (c) => {
 			"SELECT id, ProName, SmallPic, NoteTime, OrderBy, WebTitle FROM t_products WHERE IsShow = 1 AND IsCommend = 1 ORDER BY OrderBy DESC, id DESC LIMIT 8",
 		),
 	);
+	const caseRows = await rows(
+		db.prepare("SELECT id, Title, SmallPic FROM t_news WHERE IsShow = 1 AND NewType = 4 ORDER BY OrderBy DESC, id DESC LIMIT 8"),
+	);
+	const brandRows = await rows(
+		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE IsShow = 1 AND NewType = 6 ORDER BY OrderBy DESC, id DESC LIMIT 12"),
+	);
+	const partnerRows = await rows(
+		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE IsShow = 1 AND NewType = 7 ORDER BY OrderBy DESC, id DESC LIMIT 18"),
+	);
 	return c.json({
 		ok: true,
 		global: g
@@ -132,6 +141,23 @@ app.get("/home", async (c) => {
 			name: String(r.ProName ?? ""),
 			pic: String(r.SmallPic ?? ""),
 			noteTime: String(r.NoteTime ?? ""),
+		})),
+		cases: caseRows.map((r) => ({
+			id: Number(r.id),
+			title: String(r.Title ?? ""),
+			pic: String(r.SmallPic ?? ""),
+		})),
+		brands: brandRows.map((r) => ({
+			id: Number(r.id),
+			title: String(r.Title ?? ""),
+			pic: String(r.SmallPic ?? ""),
+			link: String(r.LINK ?? ""),
+		})),
+		partners: partnerRows.map((r) => ({
+			id: Number(r.id),
+			title: String(r.Title ?? ""),
+			pic: String(r.SmallPic ?? ""),
+			link: String(r.LINK ?? ""),
 		})),
 	});
 });
