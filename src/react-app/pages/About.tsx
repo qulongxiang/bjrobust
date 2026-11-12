@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import PageHero from "../components/PageHero";
 
 export default function About() {
 	const [content, setContent] = useState("");
@@ -16,14 +17,14 @@ export default function About() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>关于我们</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="关于我们"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / 关于我们
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container">

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import PageHero from "../components/PageHero";
 
 // 地图片段是旧站整页 HTML（含 <script>），dangerouslySetInnerHTML 不会执行脚本，
 // 所以这里解析出 AMap key 与坐标后动态加载高德 JS API 初始化地图；加载失败显示跳转链接兜底
@@ -98,14 +99,14 @@ export default function Contact() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>联系我们</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="联系我们"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / 联系我们
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container">

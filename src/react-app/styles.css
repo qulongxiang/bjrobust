@@ -397,11 +397,38 @@
 	cursor: default;
 }
 
-/* ============ 内页头部 / 面包屑 ============ */
+/* ============ 内页头部 / 面包屑（内页 banner 图 + 渐变遮罩） ============ */
 .page-hero {
-	background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+	position: relative;
+	overflow: hidden;
 	color: #fff;
 	padding: 44px 0;
+	background: var(--primary-dark);
+}
+
+.page-hero::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, rgba(14, 60, 110, 0.92), rgba(20, 80, 140, 0.6));
+}
+
+.page-hero > img {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* 图片缺失（如 R2 未开通）：隐藏占位图，保留渐变底 */
+.page-hero > img.img-ph {
+	display: none;
+}
+
+.page-hero .container {
+	position: relative;
+	z-index: 1;
 }
 
 .page-hero h1 {

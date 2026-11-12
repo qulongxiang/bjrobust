@@ -231,6 +231,14 @@ type Ctx = Parameters<(c: never) => void> extends never ? never : import("hono")
 	Variables: AdminVariables;
 }>;
 
+// ---- 内页 banner（NewType=2）：各内页头部配图，取第一条展示 ----
+app.get("/page-banner", async (c) => {
+	const r = await c.env.DB
+		.prepare("SELECT Title, SmallPic FROM t_news WHERE IsShow = 1 AND NewType = 2 ORDER BY OrderBy DESC, id DESC LIMIT 1")
+		.first();
+	return c.json({ ok: true, title: r ? String(r.Title ?? "") : "", pic: r ? String(r.SmallPic ?? "") : "" });
+});
+
 // ---- 新闻分类（前台 tab 用；1/2 为 banner 内部类型，不展示） ----
 app.get("/news-types", async (c) => {
 	const list = await rows(c.env.DB.prepare("SELECT id, Called FROM t_newtype WHERE id IN (3,4,5,6,7) ORDER BY id"));

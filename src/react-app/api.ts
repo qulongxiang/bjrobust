@@ -88,12 +88,17 @@ async function get<T>(url: string): Promise<T> {
 export const api = {
 	home: () => get<HomeData>("/api/site/home"),
 	global: () => get<GlobalData>("/api/site/global"),
+	pageBanner: () => get<{ title: string; pic: string }>("/api/site/page-banner"),
 	productTypes: () =>
 		get<{ items: ProTypeItem[]; tree: ProTypeItem[] }>("/api/site/product-types"),
-	products: (typeId?: number, page = 1, pageSize = 12) =>
-		get<Paged<ProductItem>>(
-			`/api/site/products${typeId ? `?typeId=${typeId}` : ""}&page=${page}&pageSize=${pageSize}`,
-		),
+	products: (typeId?: number, page = 1, pageSize = 12) => {
+		// 注意：无 typeId 时 URL 必须以 ? 开头，否则 &page=... 会被当成路径 → 404
+		const qs = new URLSearchParams();
+		if (typeId) qs.set("typeId", String(typeId));
+		qs.set("page", String(page));
+		qs.set("pageSize", String(pageSize));
+		return get<Paged<ProductItem>>(`/api/site/products?${qs.toString()}`);
+	},
 	product: (id: number) => get<ProductDetailData>(`/api/site/product/${id}`),
 	newsTypes: () =>
 		get<NewsType[]>("/api/site/news-types").catch(() =>

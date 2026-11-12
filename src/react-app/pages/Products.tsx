@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, imgUrl, type Paged, type ProductItem, type ProTypeItem } from "../api";
 import Pager from "../components/Pager";
+import PageHero from "../components/PageHero";
 
 const PAGE_SIZE = 12;
 
@@ -35,14 +36,14 @@ export default function Products() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>产品中心</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="产品中心"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / 产品中心{active ? ` / ${active.name}` : ""}
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container list-layout">

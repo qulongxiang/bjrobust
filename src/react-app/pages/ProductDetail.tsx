@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, imgUrl, type ProductDetailData } from "../api";
+import PageHero from "../components/PageHero";
 
 export default function ProductDetail() {
 	const { id } = useParams();
@@ -32,15 +33,15 @@ export default function ProductDetail() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>产品中心</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="产品中心"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / <Link to="/products">产品中心</Link>
 						{d.typeName ? <> / {d.typeName}</> : null}
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container detail-wrap">

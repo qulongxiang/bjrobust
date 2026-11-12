@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type NewsItem, type Paged } from "../api";
 import Pager from "../components/Pager";
+import PageHero from "../components/PageHero";
 
 const PAGE_SIZE = 10;
 
@@ -17,14 +18,14 @@ export default function Cases() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>成功案例</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="成功案例"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / 成功案例
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container">

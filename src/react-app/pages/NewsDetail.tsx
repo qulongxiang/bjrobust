@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type NewsDetailData } from "../api";
+import PageHero from "../components/PageHero";
 
 export default function NewsDetail() {
 	const { id } = useParams();
@@ -29,14 +30,14 @@ export default function NewsDetail() {
 
 	return (
 		<>
-			<div className="page-hero">
-				<div className="container">
-					<h1>新闻资讯</h1>
-					<div className="breadcrumb">
+			<PageHero
+				title="新闻资讯"
+				crumb={
+					<>
 						<Link to="/">首页</Link> / <Link to="/news">新闻资讯</Link> / 详情
-					</div>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			<section className="section">
 				<div className="container">
