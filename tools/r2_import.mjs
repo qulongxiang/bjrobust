@@ -5,6 +5,18 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+// 桶名从 wrangler.json 读取（必须与 dev 的绑定一致，否则写到另一个本地桶实例里）
+const wrangler = JSON.parse(readFileSync(path.join(PROJECT0(), "wrangler.json"), "utf8"));
+function PROJECT0() {
+	return "D:/softdata/text/bjrobust";
+}
+const BUCKET = wrangler.r2_buckets?.find((b) => b.binding === "IMAGES")?.bucket_name;
+if (!BUCKET) {
+	console.error("wrangler.json 未配置 IMAGES R2 绑定");
+	process.exit(1);
+}
+console.log("本地桶:", BUCKET);
+
 const ROOT = "D:/softdata/text/php-scripts/upload";
 const PROJECT = "D:/softdata/text/bjrobust";
 const MIME = {
@@ -35,7 +47,7 @@ const mf = new Miniflare(
 			{
 				name: "r2import",
 				script: "self.addEventListener('fetch', () => {});",
-				r2Buckets: { IMAGES: "bjrobust-images" },
+				r2Buckets: { IMAGES: BUCKET },
 			},
 		],
 	}),
