@@ -98,7 +98,7 @@ app.get("/home", async (c) => {
 	);
 	const productRows = await rows(
 		db.prepare(
-			"SELECT id, ProName, SmallPic, NoteTime, OrderBy, WebTitle FROM t_products WHERE IsShow = 1 AND IsCommend = 1 ORDER BY OrderBy DESC, id DESC LIMIT 8",
+			"SELECT id, ProName, SmallPic, NoteTime, OrderBy, WebTitle FROM t_products WHERE IsShow = 1 AND IsCommend = 1 ORDER BY OrderBy DESC, id DESC LIMIT 12",
 		),
 	);
 	const caseRows = await rows(

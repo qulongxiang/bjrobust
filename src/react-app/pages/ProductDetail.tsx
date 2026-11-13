@@ -34,6 +34,7 @@ export default function ProductDetail() {
 	return (
 		<>
 			<PageHero
+				banner="cn-banner/banner2.jpg"
 				title="产品中心"
 				crumb={
 					<>

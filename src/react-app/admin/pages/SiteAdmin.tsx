@@ -1,11 +1,15 @@
-// 站点设置（t_global）+ 静态页（t_content）编辑
+// 站点设置（t_global）+ 静态页（t_content）编辑 + 内页头图管理（R2 cn-banner/）
 import { useEffect, useState } from "react";
 import { adminApi, type ContentPage, type GlobalSettings } from "../api";
+
+type BannerItem = { name: string; page: string; url: string; size: number; updated: string | null };
 
 export default function SiteAdmin() {
 	const [global, setGlobal] = useState<GlobalSettings>(null);
 	const [pages, setPages] = useState<ContentPage[]>([]);
 	const [editing, setEditing] = useState<ContentPage | null>(null);
+	const [banners, setBanners] = useState<BannerItem[]>([]);
+	const [bannerBusy, setBannerBusy] = useState<string | null>(null);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 	const [busy, setBusy] = useState(false);
 
@@ -13,6 +17,8 @@ export default function SiteAdmin() {
 		setMsg({ ok, text });
 		setTimeout(() => setMsg(null), 3000);
 	};
+
+	const loadBanners = () => adminApi.bannerList().then((d) => setBanners(d.items)).catch(() => {});
 
 	useEffect(() => {
 		adminApi
@@ -23,6 +29,7 @@ export default function SiteAdmin() {
 			.content()
 			.then((d) => setPages(d.items))
 			.catch(() => {});
+		loadBanners();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -52,6 +59,20 @@ export default function SiteAdmin() {
 			flash(false, e instanceof Error ? e.message : "保存失败");
 		} finally {
 			setBusy(false);
+		}
+	};
+
+	const onBannerFile = async (name: string, file: File | null) => {
+		if (!file) return;
+		setBannerBusy(name);
+		try {
+			await adminApi.replaceBanner(name, file);
+			flash(true, "头图已替换");
+			await loadBanners();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "上传失败");
+		} finally {
+			setBannerBusy(null);
 		}
 	};
 
@@ -100,6 +121,40 @@ export default function SiteAdmin() {
 				<button className="btn primary" disabled={busy} onClick={saveGlobal}>
 					{busy ? "保存中…" : "保存站点设置"}
 				</button>
+			</div>
+
+			<div className="admin-panel">
+				<h3 style={{ marginTop: 0 }}>内页头图（各内页顶部整宽纯图，后台可直接替换）</h3>
+				<p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+					建议尺寸 1200–1920 宽、高 300–450，≤5MB（jpg/png/webp）。替换后前台强刷（Ctrl+F5）即可看到。
+				</p>
+				<div className="banner-grid">
+					{banners.map((b) => (
+						<div className="banner-slot" key={b.name}>
+							<img
+								src={b.updated ? `${b.url}?v=${encodeURIComponent(b.updated)}` : b.url}
+								alt={b.page}
+							/>
+							<div className="banner-slot-meta">
+								<span>{b.page}</span>
+								<label className="btn small">
+									{bannerBusy === b.name ? "上传中…" : "替换"}
+									<input
+										type="file"
+										accept="image/jpeg,image/png,image/webp"
+										hidden
+										disabled={bannerBusy === b.name}
+										onChange={(e) => {
+											onBannerFile(b.name, e.target.files?.[0] ?? null);
+											e.target.value = "";
+										}}
+									/>
+								</label>
+							</div>
+						</div>
+					))}
+					{!banners.length ? <div className="empty-tip">头图加载失败（R2 未开通？）</div> : null}
+				</div>
 			</div>
 
 			<div className="admin-panel">

@@ -31,6 +31,7 @@ export default function CaseDetail() {
 	return (
 		<>
 			<PageHero
+				banner="cn-banner/banner4.jpg"
 				title="成功案例"
 				crumb={
 					<>

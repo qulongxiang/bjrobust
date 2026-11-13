@@ -58,4 +58,49 @@ app.delete("/upload", async (c) => {
 	return c.json({ ok: true });
 });
 
+// ---- 内页头图（R2 cn-banner/，对应原版 PHP 站 cn/banner/ 六个固定位） ----
+const BANNERS = [
+	{ name: "banner1.jpg", page: "关于我们" },
+	{ name: "banner2.jpg", page: "产品中心" },
+	{ name: "banner3.jpg", page: "新闻资讯" },
+	{ name: "banner4.jpg", page: "成功案例" },
+	{ name: "banner5.jpg", page: "技术支持" },
+	{ name: "banner6.jpg", page: "联系我们" },
+];
+const BANNER_PREFIX = "cn-banner/";
+
+app.get("/banners", async (c) => {
+	if (!c.env.IMAGES) return c.json({ error: "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定" }, 503);
+	const items = [];
+	for (const b of BANNERS) {
+		const key = BANNER_PREFIX + b.name;
+		const obj = await c.env.IMAGES.head(key);
+		items.push({
+			name: b.name,
+			page: b.page,
+			url: `/assets/${key}`,
+			size: obj?.size ?? 0,
+			updated: obj?.uploaded ?? null,
+		});
+	}
+	return c.json({ ok: true, items });
+});
+
+app.put("/banners/:name", async (c) => {
+	if (!c.env.IMAGES) return c.json({ error: "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定" }, 503);
+	const name = c.req.param("name");
+	if (!BANNERS.some((b) => b.name === name)) return c.json({ error: "未知头图" }, 400);
+	const form = await c.req.formData().catch(() => null);
+	if (!form) return c.json({ error: "请求格式错误" }, 400);
+	const file = form.get("file");
+	if (!(file instanceof File)) return c.json({ error: "缺少 file 字段" }, 400);
+	if (file.size > MAX_SIZE) return c.json({ error: "文件超过 5MB 限制" }, 400);
+	const dot = name.lastIndexOf(".");
+	const mime = ALLOWED_EXT[name.slice(dot).toLowerCase()] ?? "image/jpeg";
+	await c.env.IMAGES.put(BANNER_PREFIX + name, file.stream(), {
+		httpMetadata: { contentType: mime },
+	});
+	return c.json({ ok: true });
+});
+
 export default app;

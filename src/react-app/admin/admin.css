@@ -530,3 +530,35 @@
 		flex-wrap: wrap;
 	}
 }
+
+/* 内页头图管理 */
+.banner-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 14px;
+}
+.banner-slot {
+	border: 1px solid #e5e9f0;
+	border-radius: 8px;
+	overflow: hidden;
+	background: #fff;
+}
+.banner-slot img {
+	width: 100%;
+	height: 110px;
+	object-fit: cover;
+	display: block;
+	background: #f2f5f9;
+}
+.banner-slot-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 10px;
+	font-size: 13px;
+}
+@media (max-width: 900px) {
+	.banner-grid {
+		grid-template-columns: 1fr;
+	}
+}

@@ -167,6 +167,20 @@ export const adminApi = {
 	setUserLock: (id: number, locked: number) =>
 		req<{ ok: boolean }>(`/api/admin/users/${id}/lock`, { method: "PUT", body: j({ locked }) }),
 
+	bannerList: () =>
+		req<{ ok: boolean; items: { name: string; page: string; url: string; size: number; updated: string | null }[] }>(
+			"/api/admin/banners",
+		),
+	replaceBanner: (name: string, file: File): Promise<{ ok: boolean }> => {
+		const form = new FormData();
+		form.append("file", file);
+		return fetch(`/api/admin/banners/${name}`, { method: "PUT", credentials: "same-origin", body: form }).then(async (r) => {
+			const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+			if (!r.ok) throw new ApiError(r.status, d.error ?? `HTTP ${r.status}`);
+			return d as { ok: true };
+		});
+	},
+
 	uploadFiles: (file: File): Promise<{ ok: boolean; path: string; url: string }> => {
 		const form = new FormData();
 		form.append("file", file);
