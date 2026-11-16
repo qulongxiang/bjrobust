@@ -78,13 +78,39 @@ select {
 	flex: 0 0 auto;
 }
 
-.footer-copy p,
-.footer-contact p {
-	margin: 4px 0;
+/* 页脚版权区：两行整齐排布，无错行 */
+.footer-copy {
+	font-size: 13px;
+	line-height: 1.9;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.footer-copy p {
+	margin: 2px 0;
+	float: none; /* 覆盖旧数据里可能残留的 float 内联样式 */
 }
 
 .footer-copy a {
-	color: #fff;
+	color: rgba(255, 255, 255, 0.85);
+	text-decoration: none;
+}
+
+.footer-copy a:hover {
+	color: #ff9f00;
+}
+
+.footer-copy img {
+	height: 14px;
+	vertical-align: -2px;
+	margin: 0 3px 0 6px;
+}
+
+.footer-copy img[src=""] {
+	display: none; /* 旧数据里残留的空 src 图 */
+}
+
+.footer-contact p {
+	margin: 4px 0;
 }
 
 .footer-qr ul {

@@ -174,6 +174,78 @@
 	background: #fff;
 }
 
+/* ============ 快速查找产品（还原旧站：编号 / 标准 / 关键词） ============ */
+.home-search {
+	background: #f5f7fa;
+	border-bottom: 1px solid var(--border);
+}
+
+.home-search-inner {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	padding-top: 14px;
+	padding-bottom: 14px;
+}
+
+.home-search-label {
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.search-bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.search-bar input {
+	width: 170px;
+	padding: 8px 12px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	font-size: 14px;
+	background: #fff;
+}
+
+.search-bar input:focus {
+	outline: none;
+	border-color: var(--primary);
+}
+
+.btn-search {
+	padding: 8px 22px;
+	border: 0;
+	border-radius: 6px;
+	background: var(--primary);
+	color: #fff;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.btn-search:hover {
+	background: var(--primary-dark);
+}
+
+.search-clear {
+	font-size: 13px;
+	color: var(--text-light);
+	text-decoration: none;
+}
+
+.search-clear:hover {
+	color: var(--primary);
+	text-decoration: underline;
+}
+
+.search-result-note {
+	font-size: 13px;
+	color: var(--text-light);
+}
+
 /* ============ 首页主体（左产品中心 / 右各栏目，还原旧站两栏） ============ */
 .home-center {
 	display: grid;

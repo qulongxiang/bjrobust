@@ -61,7 +61,12 @@ app.get("/global", async (c) => {
 	const g = await db.prepare("SELECT * FROM t_global WHERE Language = ? ORDER BY id LIMIT 1").bind(CN).first();
 	const fragRows = await rows(db.prepare("SELECT Called, Content FROM t_content WHERE Language = ?").bind(CN));
 	const fragments: Record<string, string> = {};
-	for (const r of fragRows) fragments[String(r.Called)] = String(r.Content ?? "");
+	for (const r of fragRows) {
+		// 片段清洗：去掉 <script>（旧站残留的统计代码等），/upload/ 旧路径改写到 /assets/upload/（R2）
+		fragments[String(r.Called)] = String(r.Content ?? "")
+			.replace(/<script[\s\S]*?<\/script>/gi, "")
+			.replace(/(src|href)\s*=\s*["']\/upload\//g, '$1="/assets/upload/');
+	}
 	return c.json({
 		ok: true,
 		global: g
@@ -190,11 +195,27 @@ app.get("/products", async (c) => {
 	const page = pageNum(c.req.query("page"));
 	const size = pageSize(c.req.query("pageSize"));
 	const typeId = c.req.query("typeId");
+	// 快速查找产品（还原旧站）：编号 / 标准 / 关键词
+	const bh = (c.req.query("bh") ?? "").trim().slice(0, 50);
+	const bz = (c.req.query("bz") ?? "").trim().slice(0, 50);
+	const kw = (c.req.query("kw") ?? "").trim().slice(0, 50);
 	const where: string[] = ["IsShow = 1"];
 	const params: (string | number)[] = [];
 	if (typeId) {
 		where.push("TypeID = ?");
 		params.push(Number(typeId));
+	}
+	if (bh) {
+		where.push("BH LIKE ?");
+		params.push(`%${bh}%`);
+	}
+	if (bz) {
+		where.push("BZ LIKE ?");
+		params.push(`%${bz}%`);
+	}
+	if (kw) {
+		where.push("(ProName LIKE ? OR MEMO LIKE ? OR BH LIKE ? OR BZ LIKE ?)");
+		params.push(`%${kw}%`, `%${kw}%`, `%${kw}%`, `%${kw}%`);
 	}
 	const whereSql = where.join(" AND ");
 	const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM t_products WHERE ${whereSql}`).bind(...params).first();

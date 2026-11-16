@@ -1,11 +1,21 @@
-// 首页：纯图 banner 轮播 + 各栏目带图（还原旧 PHP 站排版）
+// 首页：纯图 banner 轮播 + 快速查找产品 + 各栏目带图（还原旧 PHP 站排版）
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, imgUrl, type HomeData } from "../api";
 
 export default function Home() {
 	const [d, setD] = useState<HomeData | null>(null);
 	const [slide, setSlide] = useState(0);
+	const [q, setQ] = useState({ bh: "", bz: "", kw: "" });
+	const navigate = useNavigate();
+
+	const doSearch = () => {
+		const qs = new URLSearchParams();
+		if (q.bh.trim()) qs.set("bh", q.bh.trim());
+		if (q.bz.trim()) qs.set("bz", q.bz.trim());
+		if (q.kw.trim()) qs.set("kw", q.kw.trim());
+		navigate(`/products${qs.toString() ? `?${qs.toString()}` : ""}`);
+	};
 
 	useEffect(() => {
 		api.home().then(setD).catch(() => setD(null));
@@ -43,6 +53,36 @@ export default function Home() {
 						))}
 					</div>
 				) : null}
+			</div>
+
+			{/* 快速查找产品（还原旧站）：编号 / 标准 / 关键词 */}
+			<div className="home-search">
+				<div className="container home-search-inner">
+					<span className="home-search-label">快速查找产品-</span>
+					<div className="search-bar">
+						<input
+							placeholder="编号"
+							value={q.bh}
+							onChange={(e) => setQ({ ...q, bh: e.target.value })}
+							onKeyDown={(e) => e.key === "Enter" && doSearch()}
+						/>
+						<input
+							placeholder="标准"
+							value={q.bz}
+							onChange={(e) => setQ({ ...q, bz: e.target.value })}
+							onKeyDown={(e) => e.key === "Enter" && doSearch()}
+						/>
+						<input
+							placeholder="关键词"
+							value={q.kw}
+							onChange={(e) => setQ({ ...q, kw: e.target.value })}
+							onKeyDown={(e) => e.key === "Enter" && doSearch()}
+						/>
+						<button className="btn-search" onClick={doSearch}>
+							搜索
+						</button>
+					</div>
+				</div>
 			</div>
 
 			{/* 主体：左产品中心 / 右各栏目（还原旧站两栏） */}

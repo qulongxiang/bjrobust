@@ -94,10 +94,18 @@ export const api = {
 	pageBanner: () => get<{ title: string; pic: string }>("/api/site/page-banner"),
 	productTypes: () =>
 		get<{ items: ProTypeItem[]; tree: ProTypeItem[] }>("/api/site/product-types"),
-	products: (typeId?: number, page = 1, pageSize = 12) => {
+	products: (
+		typeId?: number,
+		page = 1,
+		pageSize = 12,
+		filters?: { bh?: string; bz?: string; kw?: string },
+	) => {
 		// 注意：无 typeId 时 URL 必须以 ? 开头，否则 &page=... 会被当成路径 → 404
 		const qs = new URLSearchParams();
 		if (typeId) qs.set("typeId", String(typeId));
+		if (filters?.bh) qs.set("bh", filters.bh);
+		if (filters?.bz) qs.set("bz", filters.bz);
+		if (filters?.kw) qs.set("kw", filters.kw);
 		qs.set("page", String(page));
 		qs.set("pageSize", String(pageSize));
 		return get<Paged<ProductItem>>(`/api/site/products?${qs.toString()}`);
