@@ -127,6 +127,45 @@
 	color: var(--primary);
 }
 
+/* ============ 顶栏（还原旧站：公司名欢迎语 + 全国服务热线/邮箱） ============ */
+.top-bar {
+	background: var(--primary-dark);
+	color: rgba(255, 255, 255, 0.92);
+	font-size: 13px;
+}
+
+.top-bar-inner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+
+.top-bar-welcome {
+	letter-spacing: 0.5px;
+}
+
+.top-bar-hotline {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	flex-wrap: wrap;
+}
+
+.top-bar-hotline b {
+	color: #ff9f00;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.top-bar-mail b {
+	color: #fff;
+	font-size: 13px;
+}
+
 /* ============ 首页横幅（纯图轮播，无文字压图，还原旧站） ============ */
 .hero {
 	position: relative;

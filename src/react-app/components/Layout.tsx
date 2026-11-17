@@ -29,6 +29,20 @@ export default function Layout() {
 
 	return (
 		<div className="layout">
+			{/* 顶栏：还原旧站——公司名欢迎语 + 全国服务热线/邮箱 */}
+			<div className="top-bar">
+				<div className="container top-bar-inner">
+					<span className="top-bar-welcome">欢迎进入北京罗巴斯特科技有限公司官网！</span>
+					<span className="top-bar-hotline">
+						<span>
+							全国服务热线：<b>+86 10 61252911 / 15810050111</b>
+						</span>
+						<span className="top-bar-mail">
+							全国服务邮箱：<b>sales@bjrobust.com</b>
+						</span>
+					</span>
+				</div>
+			</div>
 			<header className="site-header">
 				<div className="container header-inner">
 					<Link to="/" className="logo">

@@ -1,6 +1,7 @@
 // 应用路由：前台页面 + 后台管理（/admin）
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import ScrollToTop from "./components/ScrollToTop";
 import AdminApp from "./admin/AdminApp";
 import Home from "./pages/Home";
 import Products from "./pages/Products";
@@ -16,6 +17,7 @@ import "./styles.css";
 export default function App() {
 	return (
 		<BrowserRouter>
+			<ScrollToTop />
 			<Routes>
 				<Route path="/admin/*" element={<AdminApp />} />
 				<Route element={<Layout />}>
