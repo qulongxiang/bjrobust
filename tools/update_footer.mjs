@@ -25,7 +25,8 @@ if (!row) {
 const old = String(row.Content);
 const badge = old.match(/<img src="(data:image\/png;base64,[A-Za-z0-9+/=]+)"[^>]*>/)?.[1] ?? "";
 
-const newContent = `<p>版权所有 &copy; 北京罗巴斯特科技有限公司</p>\n<p><a href="https://beian.miit.gov.cn" target="_blank" rel="noopener">京ICP备18025598号-1</a>&nbsp;&nbsp;&nbsp;${badge ? `<img src="${badge}" alt="" /> ` : ""}<a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11011502006754" target="_blank" rel="noopener">京公网安备 11011502006754号</a></p>`;
+// 三行排布：公司版权 / ICP 备案 / 公安备案（警徽图标），各自独立一行
+const newContent = `<p>版权所有 &copy; 北京罗巴斯特科技有限公司</p>\n<p><a href="https://beian.miit.gov.cn" target="_blank" rel="noopener">京ICP备18025598号-1</a></p>\n<p>${badge ? `<img src="${badge}" alt="" /> ` : ""}<a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11011502006754" target="_blank" rel="noopener">京公网安备 11011502006754号</a></p>`;
 console.log("新片段长度:", newContent.length, "| 警徽图标保留:", Boolean(badge));
 
 if (mode === "local" || mode === "all") {
