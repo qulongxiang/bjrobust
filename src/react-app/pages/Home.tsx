@@ -122,7 +122,7 @@ export default function Home() {
 								<span>成功案例</span>
 								<Link className="mores" to="/cases">MORE+</Link>
 							</div>
-							<div className="case-grid">
+							<div className="card-grid">
 								{d.cases.slice(0, 4).map((c) => (
 									<Link to={`/cases/${c.id}`} key={c.id} className="case-item">
 										<img src={imgUrl(c.pic)} alt={c.title} loading="lazy" />

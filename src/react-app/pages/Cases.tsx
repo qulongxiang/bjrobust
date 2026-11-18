@@ -31,15 +31,15 @@ export default function Cases() {
 			<section className="section">
 				<div className="container">
 					{data?.items.length ? (
-						<div className="case-grid">
+						<div className="card-grid">
 							{data.items.map((n) => (
-								<Link className="case-card" to={`/cases/${n.id}`} key={n.id}>
-									<div className="case-pic">
+								<Link className="card-item" to={`/cases/${n.id}`} key={n.id}>
+									<div className="card-pic">
 										{n.pic ? <img src={imgUrl(n.pic)} alt={n.title} loading="lazy" /> : null}
 									</div>
-									<div className="case-info">
-										<div className="case-title">{n.title}</div>
-										<div className="case-date">{n.noteTime.slice(0, 10)}</div>
+									<div className="card-info">
+										<div className="card-title">{n.title}</div>
+										<div className="card-date">{n.noteTime.slice(0, 10)}</div>
 									</div>
 								</Link>
 							))}

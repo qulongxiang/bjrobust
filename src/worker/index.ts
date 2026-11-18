@@ -28,12 +28,25 @@ app.route("/api/admin", adminProtected);
 app.get("/*", async (c) => {
 	const req = c.req.raw;
 	const res = await c.env.ASSETS.fetch(req);
-	if (res.status !== 404) return res;
-	if ((req.headers.get("accept") ?? "").includes("text/html")) {
-		const indexUrl = new URL("/", req.url).toString();
-		return c.env.ASSETS.fetch(new Request(indexUrl, { headers: { accept: "text/html" } }));
+	if (res.status === 404) {
+		if ((req.headers.get("accept") ?? "").includes("text/html")) {
+			const indexUrl = new URL("/", req.url).toString();
+			const indexRes = await c.env.ASSETS.fetch(new Request(indexUrl, { headers: { accept: "text/html" } }));
+			return noCacheHtml(indexRes);
+		}
+		return c.notFound();
 	}
-	return c.notFound();
+	// HTML 入口一律不缓存：部署新资源后，旧的 index.html 指向已删除的资源 hash 会导致白屏
+	if ((res.headers.get("content-type") ?? "").includes("text/html")) {
+		return noCacheHtml(res);
+	}
+	return res;
 });
+
+function noCacheHtml(res: Response): Response {
+	const out = new Response(res.body, res);
+	out.headers.set("cache-control", "no-cache");
+	return out;
+}
 
 export default app;

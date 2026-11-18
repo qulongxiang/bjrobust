@@ -299,13 +299,13 @@
 }
 
 /* ============ 成功案例卡片网格（还原旧站 case.php：图片+文字，悬停放大） ============ */
-.case-grid {
+.card-grid {
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
 	gap: 20px;
 }
 
-.case-card {
+.card-item {
 	border: 1px solid var(--border);
 	border-radius: 8px;
 	overflow: hidden;
@@ -313,33 +313,33 @@
 	transition: box-shadow 0.18s, transform 0.18s;
 }
 
-.case-card:hover {
+.card-item:hover {
 	box-shadow: var(--shadow);
 	transform: translateY(-3px);
 }
 
-.case-pic {
+.card-pic {
 	height: 170px;
 	background: linear-gradient(135deg, #f2f5f9, #e9edf3);
 	overflow: hidden;
 }
 
-.case-pic img {
+.card-pic img {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 	transition: transform 0.3s;
 }
 
-.case-card:hover .case-pic img {
+.card-item:hover .card-pic img {
 	transform: scale(1.05);
 }
 
-.case-info {
+.card-info {
 	padding: 12px 14px;
 }
 
-.case-title {
+.card-title {
 	font-size: 14px;
 	font-weight: 600;
 	white-space: nowrap;
@@ -347,11 +347,11 @@
 	text-overflow: ellipsis;
 }
 
-.case-card:hover .case-title {
+.card-item:hover .card-title {
 	color: var(--primary);
 }
 
-.case-date {
+.card-date {
 	margin-top: 4px;
 	font-size: 12px;
 	color: var(--text-light);
@@ -374,13 +374,13 @@
 }
 
 @media (max-width: 1100px) {
-	.case-grid {
+	.card-grid {
 		grid-template-columns: repeat(3, 1fr);
 	}
 }
 
 @media (max-width: 800px) {
-	.case-grid {
+	.card-grid {
 		grid-template-columns: repeat(2, 1fr);
 	}
 }
@@ -500,7 +500,7 @@
 	margin: 0 0 6px;
 }
 
-.case-grid {
+.card-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 12px;

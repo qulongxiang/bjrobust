@@ -1,7 +1,7 @@
 // 新闻列表：分类 tabs + 列表 + 分页
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, type NewsItem, type NewsType, type Paged } from "../api";
+import { api, imgUrl, type NewsItem, type NewsType, type Paged } from "../api";
 import Pager from "../components/Pager";
 import PageHero from "../components/PageHero";
 
@@ -54,21 +54,23 @@ export default function News() {
 						))}
 					</div>
 
-					<div className="news-list">
-						{data?.items.length ? (
-							data.items.map((n) => (
-								<div className="news-row" key={n.id}>
-									<span className="date">{n.noteTime.slice(0, 10)}</span>
-									<Link className="title" to={`/news/${n.id}`}>
-										{n.title}
-									</Link>
-									<span className="arrow">›</span>
-								</div>
-							))
-						) : (
-							<div className="empty">暂无内容</div>
-						)}
-					</div>
+					{data?.items.length ? (
+						<div className="card-grid">
+							{data.items.map((n) => (
+								<Link className="card-item" to={`/news/${n.id}`} key={n.id}>
+									<div className="card-pic">
+										{n.pic ? <img src={imgUrl(n.pic)} alt={n.title} loading="lazy" /> : null}
+									</div>
+									<div className="card-info">
+										<div className="card-title">{n.title}</div>
+										<div className="card-date">{n.noteTime.slice(0, 10)}</div>
+									</div>
+								</Link>
+							))}
+						</div>
+					) : (
+						<div className="empty">暂无内容</div>
+					)}
 
 					<Pager
 						page={page}
