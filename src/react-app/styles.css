@@ -285,6 +285,19 @@
 	color: var(--text-light);
 }
 
+/* 产品列表页顶部常驻搜索条（还原旧站 searchn 位置） */
+.search-strip {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	background: #f5f7fa;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 12px 16px;
+	margin-bottom: 24px;
+}
+
 /* ============ 首页主体（左产品中心 / 右各栏目，还原旧站两栏） ============ */
 .home-center {
 	display: grid;

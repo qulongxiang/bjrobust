@@ -1,4 +1,4 @@
-// 产品列表：左侧分类树 + 右侧产品网格 + 分页；支持快速查找产品（编号/标准/关键词）
+// 产品列表：搜索条常驻（还原旧站 products.php 顶部搜索框）+ 左侧分类树 + 产品网格 + 分页
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, imgUrl, type Paged, type ProductItem, type ProTypeItem } from "../api";
@@ -17,10 +17,16 @@ export default function Products() {
 	const searching = Boolean(bh || bz || kw);
 	const [tree, setTree] = useState<ProTypeItem[]>([]);
 	const [data, setData] = useState<Paged<ProductItem> | null>(null);
+	// 搜索框本地状态：输入不打扰，点"搜索"/回车才真正查询（与旧站表单行为一致）
+	const [form, setForm] = useState({ bh, bz, kw });
 
 	useEffect(() => {
 		api.productTypes().then((d) => setTree(d.tree)).catch(() => {});
 	}, []);
+
+	useEffect(() => {
+		setForm({ bh, bz, kw });
+	}, [bh, bz, kw]);
 
 	useEffect(() => {
 		api
@@ -37,6 +43,14 @@ export default function Products() {
 		}
 		if (Object.keys(patch).length && patch.page === undefined) next.delete("page");
 		setParams(next);
+	};
+
+	const doSearch = () => {
+		setParam({
+			bh: form.bh.trim() || null,
+			bz: form.bz.trim() || null,
+			kw: form.kw.trim() || null,
+		});
 	};
 
 	const clearSearch = () => setParam({ bh: null, bz: null, kw: null, typeId: null });
@@ -56,78 +70,108 @@ export default function Products() {
 			/>
 
 			<section className="section">
-				<div className="container list-layout">
-					{!searching ? (
-						<aside className="cat-tree">
-							<span className={`cat-item ${typeId === 0 ? "on" : ""}`} onClick={() => setParam({ typeId: null })}>
-								全部产品
-							</span>
-							{tree.map((t) => (
-								<div key={t.id}>
-									<span
-										className={`cat-item ${typeId === t.id ? "on" : ""}`}
-										onClick={() => setParam({ typeId: String(t.id) })}
+				<div className="container">
+					{/* 快速查找产品（还原旧站：产品列表页顶部常驻搜索框） */}
+					<div className="search-strip">
+						<span className="home-search-label">快速查找产品-</span>
+						<div className="search-bar">
+							<input
+								placeholder="编号"
+								value={form.bh}
+								onChange={(e) => setForm({ ...form, bh: e.target.value })}
+								onKeyDown={(e) => e.key === "Enter" && doSearch()}
+							/>
+							<input
+								placeholder="标准"
+								value={form.bz}
+								onChange={(e) => setForm({ ...form, bz: e.target.value })}
+								onKeyDown={(e) => e.key === "Enter" && doSearch()}
+							/>
+							<input
+								placeholder="关键词"
+								value={form.kw}
+								onChange={(e) => setForm({ ...form, kw: e.target.value })}
+								onKeyDown={(e) => e.key === "Enter" && doSearch()}
+							/>
+							<button className="btn-search" onClick={doSearch}>
+								搜索
+							</button>
+							{searching ? (
+								<>
+									<a
+										className="search-clear"
+										href="/products"
+										onClick={(e) => {
+											e.preventDefault();
+											clearSearch();
+										}}
 									>
-										{t.name}
-									</span>
-									{(t.children ?? []).map((c) => (
-										<span
-											key={c.id}
-											className={`cat-item cat-sub ${typeId === c.id ? "on" : ""}`}
-											onClick={() => setParam({ typeId: String(c.id) })}
-										>
-											{c.name}
-										</span>
-									))}
-								</div>
-							))}
-						</aside>
-					) : null}
+										清除搜索
+									</a>
+									{data ? <span className="search-result-note">共 {data.total} 条结果</span> : null}
+								</>
+							) : null}
+						</div>
+					</div>
 
-					<div>
-						{searching ? (
-							<div className="home-search" style={{ marginBottom: 16, borderRadius: 8 }}>
-								<div className="container home-search-inner">
-									<span className="home-search-label">快速查找产品-</span>
-									<div className="search-bar">
-										<input placeholder="编号" defaultValue={bh} onChange={(e) => setParam({ bh: e.target.value })} />
-										<input placeholder="标准" defaultValue={bz} onChange={(e) => setParam({ bz: e.target.value })} />
-										<input placeholder="关键词" defaultValue={kw} onChange={(e) => setParam({ kw: e.target.value })} />
-										<button className="btn-search" onClick={() => setParam({ page: null })}>
-											搜索
-										</button>
-										<a className="search-clear" href="/products" onClick={() => clearSearch()}>
-											清除搜索
-										</a>
-										{data ? <span className="search-result-note">共 {data.total} 条结果</span> : null}
+					<div className="list-layout">
+						{!searching ? (
+							<aside className="cat-tree">
+								<span
+									className={`cat-item ${typeId === 0 ? "on" : ""}`}
+									onClick={() => setParam({ typeId: null })}
+								>
+									全部产品
+								</span>
+								{tree.map((t) => (
+									<div key={t.id}>
+										<span
+											className={`cat-item ${typeId === t.id ? "on" : ""}`}
+											onClick={() => setParam({ typeId: String(t.id) })}
+										>
+											{t.name}
+										</span>
+										{(t.children ?? []).map((c) => (
+											<span
+												key={c.id}
+												className={`cat-item cat-sub ${typeId === c.id ? "on" : ""}`}
+												onClick={() => setParam({ typeId: String(c.id) })}
+											>
+												{c.name}
+											</span>
+										))}
 									</div>
-								</div>
-							</div>
+								))}
+							</aside>
 						) : null}
 
-						{data?.items.length ? (
-							<div className="product-grid">
-								{data.items.map((p) => (
-									<Link className="product-card" to={`/products/${p.id}`} key={p.id}>
-										<div className="pic">
-											{p.smallPic ? <img src={imgUrl(p.smallPic)} alt={p.name} loading="lazy" /> : null}
-										</div>
-										<div className="body">
-											<div className="name">{p.name}</div>
-											<div className="time">{p.noteTime.slice(0, 10)}</div>
-										</div>
-									</Link>
-								))}
-							</div>
-						) : (
-							<div className="empty">{searching ? "未找到匹配的产品" : "暂无产品"}</div>
-						)}
-						<Pager
-							page={page}
-							pageSize={PAGE_SIZE}
-							total={data?.total ?? 0}
-							onChange={(p) => setParam({ page: p === 1 ? null : String(p) })}
-						/>
+						<div>
+							{data?.items.length ? (
+								<div className="product-grid">
+									{data.items.map((p) => (
+										<Link className="product-card" to={`/products/${p.id}`} key={p.id}>
+											<div className="pic">
+												{p.smallPic ? (
+													<img src={imgUrl(p.smallPic)} alt={p.name} loading="lazy" />
+												) : null}
+											</div>
+											<div className="body">
+												<div className="name">{p.name}</div>
+												<div className="time">{p.noteTime.slice(0, 10)}</div>
+											</div>
+										</Link>
+									))}
+								</div>
+							) : (
+								<div className="empty">{searching ? "未找到匹配的产品" : "暂无产品"}</div>
+							)}
+							<Pager
+								page={page}
+								pageSize={PAGE_SIZE}
+								total={data?.total ?? 0}
+								onChange={(p) => setParam({ page: p === 1 ? null : String(p) })}
+							/>
+						</div>
 					</div>
 				</div>
 			</section>
