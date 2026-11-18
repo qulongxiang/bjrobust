@@ -298,6 +298,93 @@
 	margin-bottom: 24px;
 }
 
+/* ============ 成功案例卡片网格（还原旧站 case.php：图片+文字，悬停放大） ============ */
+.case-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 20px;
+}
+
+.case-card {
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: hidden;
+	background: #fff;
+	transition: box-shadow 0.18s, transform 0.18s;
+}
+
+.case-card:hover {
+	box-shadow: var(--shadow);
+	transform: translateY(-3px);
+}
+
+.case-pic {
+	height: 170px;
+	background: linear-gradient(135deg, #f2f5f9, #e9edf3);
+	overflow: hidden;
+}
+
+.case-pic img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transition: transform 0.3s;
+}
+
+.case-card:hover .case-pic img {
+	transform: scale(1.05);
+}
+
+.case-info {
+	padding: 12px 14px;
+}
+
+.case-title {
+	font-size: 14px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.case-card:hover .case-title {
+	color: var(--primary);
+}
+
+.case-date {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--text-light);
+}
+
+/* 案例封面图（详情页顶部） */
+.case-img {
+	margin-bottom: 20px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: hidden;
+	background: #f8f9fb;
+	text-align: center;
+}
+
+.case-img img {
+	width: 100%;
+	max-height: 460px;
+	object-fit: contain;
+}
+
+@media (max-width: 1100px) {
+	.case-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+@media (max-width: 800px) {
+	.case-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
 /* ============ 首页主体（左产品中心 / 右各栏目，还原旧站两栏） ============ */
 .home-center {
 	display: grid;

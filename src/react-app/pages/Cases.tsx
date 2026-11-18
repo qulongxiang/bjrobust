@@ -1,7 +1,7 @@
-// 成功案例列表
+// 成功案例列表："图片 + 文字"卡片网格（还原旧站 case.php，悬停放大）
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, type NewsItem, type Paged } from "../api";
+import { api, imgUrl, type NewsItem, type Paged } from "../api";
 import Pager from "../components/Pager";
 import PageHero from "../components/PageHero";
 
@@ -30,21 +30,23 @@ export default function Cases() {
 
 			<section className="section">
 				<div className="container">
-					<div className="news-list">
-						{data?.items.length ? (
-							data.items.map((n) => (
-								<div className="news-row" key={n.id}>
-									<span className="date">{n.noteTime.slice(0, 10)}</span>
-									<Link className="title" to={`/cases/${n.id}`}>
-										{n.title}
-									</Link>
-									<span className="arrow">›</span>
-								</div>
-							))
-						) : (
-							<div className="empty">暂无案例</div>
-						)}
-					</div>
+					{data?.items.length ? (
+						<div className="case-grid">
+							{data.items.map((n) => (
+								<Link className="case-card" to={`/cases/${n.id}`} key={n.id}>
+									<div className="case-pic">
+										{n.pic ? <img src={imgUrl(n.pic)} alt={n.title} loading="lazy" /> : null}
+									</div>
+									<div className="case-info">
+										<div className="case-title">{n.title}</div>
+										<div className="case-date">{n.noteTime.slice(0, 10)}</div>
+									</div>
+								</Link>
+							))}
+						</div>
+					) : (
+						<div className="empty">暂无案例</div>
+					)}
 					<Pager
 						page={page}
 						pageSize={PAGE_SIZE}

@@ -1,7 +1,7 @@
 // 新闻详情：内容 + 上一篇/下一篇
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type NewsDetailData } from "../api";
+import { api, imgUrl, type NewsDetailData } from "../api";
 import PageHero from "../components/PageHero";
 
 export default function NewsDetail() {
@@ -43,6 +43,11 @@ export default function NewsDetail() {
 			<section className="section">
 				<div className="container">
 					<div className="detail-body">
+						{n.smallPic ? (
+							<div className="case-img">
+								<img src={imgUrl(n.smallPic)} alt={n.title} />
+							</div>
+						) : null}
 						<h1>{n.title}</h1>
 						<div className="detail-meta">
 							<span>发布时间：{n.noteTime.slice(0, 16)}</span>

@@ -21,12 +21,17 @@ function pageSize(v: string | undefined): number {
 	return Math.min(Math.max(n, 1), 50);
 }
 
+// 旧站遗留的 /upload/ 图片路径 → R2 的 /assets/upload/（内容内嵌图）
+function rewriteUploads(html: string): string {
+	return html.replace(/(src|href)\s*=\s*["']?\/upload\//gi, '$1="/assets/upload/');
+}
+
 function pickNews(r: Record<string, unknown>) {
 	return {
 		id: Number(r.id),
 		title: String(r.Title ?? ""),
 		noteTime: String(r.NoteTime ?? ""),
-		content: String(r.Content ?? ""),
+		content: rewriteUploads(String(r.Content ?? "")),
 		order: Number(r.OrderBy ?? 0),
 		newType: Number(r.NewType ?? 0),
 		hits: Number(r.Hits ?? 0),
