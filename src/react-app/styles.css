@@ -398,7 +398,7 @@
 	padding: 16px;
 	border-bottom: 1px dashed #dcdcdc;
 	border-radius: 8px;
-	transition: background 0.15s;
+	transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .news-line-pic {
@@ -452,18 +452,15 @@
 	gap: 16px;
 }
 
-/* 悬停还原旧站：整行深蓝底白字 */
+/* 悬停：浅灰底 + 轻微上浮 + 阴影 + 标题变品牌蓝（比旧版整行深蓝更柔和） */
 .news-line:hover {
-	background: #000044;
+	background: #f5f7fa;
+	box-shadow: var(--shadow);
+	transform: translateY(-2px);
 }
 
 .news-line:hover .news-line-title {
-	color: #fff;
-}
-
-.news-line:hover .news-line-memo,
-.news-line:hover .news-line-meta {
-	color: rgba(255, 255, 255, 0.75);
+	color: var(--primary);
 }
 
 @media (max-width: 700px) {
