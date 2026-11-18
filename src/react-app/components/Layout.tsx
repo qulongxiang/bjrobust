@@ -72,6 +72,7 @@ export default function Layout() {
 			<footer className="site-footer">
 				<div className="container footer-inner">
 					<div className="footer-col footer-left">
+						<img className="footer-logo" src="/assets/cn-images/logo-di.jpg" alt="北京罗巴斯特科技有限公司" />
 						<div
 							className="footer-copy"
 							dangerouslySetInnerHTML={{ __html: fragments["底部版权"] || "" }}

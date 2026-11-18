@@ -65,9 +65,23 @@ select {
 }
 
 .footer-left {
-	flex: 0 0 250px;
+	/* 宽度随内容自适应（不再固定 250px），公司名变长也撑得开，不会挤压换行 */
+	flex: 0 0 auto;
+	min-width: 250px;
 	border-right: 1px solid #4d4d7c;
 	padding-right: 24px;
+}
+
+/* 页脚 logo（还原旧站：版权文字上方，199px 宽） */
+.footer-logo {
+	width: 199px;
+	max-width: 100%;
+	margin-bottom: 15px;
+}
+
+/* logo 缺失时隐藏占位图 */
+.footer-logo.img-ph {
+	display: none;
 }
 
 .footer-contact {
@@ -88,6 +102,7 @@ select {
 .footer-copy p {
 	margin: 2px 0;
 	float: none; /* 覆盖旧数据里可能残留的 float 内联样式 */
+	white-space: nowrap; /* 版权三行各自一行显示，不换行 */
 }
 
 .footer-copy a {
@@ -137,6 +152,18 @@ select {
 	color: #fff;
 	height: 30px;
 	line-height: 30px;
+}
+
+/* 窄屏：页脚三栏堆叠，允许版权文字换行（超长公司名不溢出） */
+@media (max-width: 900px) {
+	.footer-copy p {
+		white-space: normal;
+	}
+
+	.footer-left {
+		border-right: 0;
+		padding-right: 0;
+	}
 }
 
 /* ===== 地图（联系我们页） ===== */
