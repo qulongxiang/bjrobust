@@ -398,7 +398,7 @@ app.get("/page/:called", async (c) => {
 	return c.json({
 		ok: true,
 		called,
-		content: String(rowPage.Content ?? ""),
+		content: rewriteUploads(String(rowPage.Content ?? "")),
 		noteTime: String(rowPage.NoteTime ?? ""),
 	});
 });

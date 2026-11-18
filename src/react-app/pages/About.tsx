@@ -1,11 +1,12 @@
-// 关于我们（静态页：t_content 公司概况）
+// 关于我们（静态页：t_content 公司概况 + 旧站 about.php 还原的合作伙伴图片墙）
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, imgUrl, type NewsItem } from "../api";
 import PageHero from "../components/PageHero";
 
 export default function About() {
 	const [content, setContent] = useState("");
+	const [partners, setPartners] = useState<NewsItem[]>([]);
 	const [failed, setFailed] = useState(false);
 
 	useEffect(() => {
@@ -13,6 +14,11 @@ export default function About() {
 			.staticPage("公司概况")
 			.then((d) => setContent(d.content))
 			.catch(() => setFailed(true));
+		// 合作伙伴图片墙（旧站 about.php：newslist("合作伙伴")）
+		api
+			.news(7, 1, 50)
+			.then((d) => setPartners(d.items))
+			.catch(() => {});
 	}, []);
 
 	return (
@@ -36,6 +42,19 @@ export default function About() {
 					) : (
 						<div className="empty">加载中…</div>
 					)}
+
+					{partners.length ? (
+						<div className="about-partners">
+							<div className="about-sec-title">合作伙伴</div>
+							<div className="about-partner-grid">
+								{partners.map((p) => (
+									<div className="about-partner-item" key={p.id} title={p.title}>
+										{p.pic ? <img src={imgUrl(p.pic)} alt={p.title} loading="lazy" /> : null}
+									</div>
+								))}
+							</div>
+						</div>
+					) : null}
 				</div>
 			</section>
 		</>
