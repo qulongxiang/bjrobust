@@ -55,15 +55,19 @@ export default function News() {
 					</div>
 
 					{data?.items.length ? (
-						<div className="card-grid">
+						<div className="news-line-list">
 							{data.items.map((n) => (
-								<Link className="card-item" to={`/news/${n.id}`} key={n.id}>
-									<div className="card-pic">
+								<Link className="news-line" to={`/news/${n.id}`} key={n.id}>
+									<div className="news-line-pic">
 										{n.pic ? <img src={imgUrl(n.pic)} alt={n.title} loading="lazy" /> : null}
 									</div>
-									<div className="card-info">
-										<div className="card-title">{n.title}</div>
-										<div className="card-date">{n.noteTime.slice(0, 10)}</div>
+									<div className="news-line-body">
+										<div className="news-line-title">{n.title}</div>
+										{n.memo ? <div className="news-line-memo">{n.memo}</div> : null}
+										<div className="news-line-meta">
+											<span>{n.noteTime.slice(0, 10)}</span>
+											<span>浏览：{n.hits}</span>
+										</div>
 									</div>
 								</Link>
 							))}

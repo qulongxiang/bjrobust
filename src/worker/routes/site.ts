@@ -310,7 +310,7 @@ app.get("/news", async (c) => {
 	const list = await rows(
 		db
 			.prepare(
-				"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits, WebTitle FROM t_news WHERE IsShow = 1 AND NewType = ? ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
+				"SELECT id, Title, NoteTime, SmallPic, Memo, OrderBy, Hits, WebTitle FROM t_news WHERE IsShow = 1 AND NewType = ? ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
 			)
 			.bind(type, size, (page - 1) * size),
 	);
@@ -326,6 +326,7 @@ app.get("/news", async (c) => {
 			title: String(r.Title ?? ""),
 			noteTime: String(r.NoteTime ?? ""),
 			pic: String(r.SmallPic ?? ""),
+			memo: String(r.Memo ?? ""),
 			hits: Number(r.Hits ?? 0),
 		})),
 	});

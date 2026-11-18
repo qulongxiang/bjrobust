@@ -23,7 +23,7 @@ export type GlobalData = { global: GlobalInfo; fragments: Record<string, string>
 
 export type Paged<T> = { total: number; page: number; pageSize: number; items: T[] };
 
-export type NewsItem = { id: number; title: string; noteTime: string; pic: string; hits: number };
+export type NewsItem = { id: number; title: string; noteTime: string; pic: string; hits: number; memo?: string };
 export type NewsDetailData = {
 	news: {
 		id: number;

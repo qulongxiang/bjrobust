@@ -385,6 +385,99 @@
 	}
 }
 
+/* ============ 新闻列表横向行（还原旧站 news.php：左图右文，悬停整行深蓝底） ============ */
+.news-line-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.news-line {
+	display: flex;
+	align-items: stretch;
+	gap: 20px;
+	padding: 16px;
+	border-bottom: 1px dashed #dcdcdc;
+	border-radius: 8px;
+	transition: background 0.15s;
+}
+
+.news-line-pic {
+	flex: 0 0 180px;
+	height: 130px;
+	border-radius: 6px;
+	overflow: hidden;
+	background: linear-gradient(135deg, #f2f5f9, #e9edf3);
+}
+
+.news-line-pic img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.news-line-body {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.news-line-title {
+	font-size: 18px;
+	font-weight: 600;
+	color: #374151;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.news-line-memo {
+	margin-top: 10px;
+	font-size: 14px;
+	color: #6b7280;
+	line-height: 24px;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.news-line-meta {
+	margin-top: auto;
+	padding-top: 10px;
+	font-size: 13px;
+	color: #9ca3af;
+	display: flex;
+	gap: 16px;
+}
+
+/* 悬停还原旧站：整行深蓝底白字 */
+.news-line:hover {
+	background: #000044;
+}
+
+.news-line:hover .news-line-title {
+	color: #fff;
+}
+
+.news-line:hover .news-line-memo,
+.news-line:hover .news-line-meta {
+	color: rgba(255, 255, 255, 0.75);
+}
+
+@media (max-width: 700px) {
+	.news-line {
+		flex-direction: column;
+	}
+
+	.news-line-pic {
+		flex: none;
+		width: 100%;
+		height: 180px;
+	}
+}
+
 /* ============ 首页主体（左产品中心 / 右各栏目，还原旧站两栏） ============ */
 .home-center {
 	display: grid;
