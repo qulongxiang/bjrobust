@@ -25,10 +25,10 @@ export default function About() {
 		<>
 			<PageHero
 				banner="cn-banner/banner1.jpg"
-				title="关于我们"
+				title="公司概况"
 				crumb={
 					<>
-						<Link to="/">首页</Link> / 关于我们
+						<Link to="/">首页</Link> / 公司概况
 					</>
 				}
 			/>

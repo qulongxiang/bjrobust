@@ -1,36 +1,16 @@
-// 后台入口：登录守卫 + 模块路由
+// 后台入口：登录页（AdminLogin）+ 登录守卫布局（默认导出 AdminApp）
+// 注意：子路由（news/products/…）在 App.tsx 里以 children 声明，这里通过 <Outlet/> 渲染——
+// react-router 7 下 splat 路由内嵌套 <Routes> 不渲染（曾导致 /admin 白屏），必须用扁平结构。
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import AdminLayout, { type AdminCtx } from "./AdminLayout";
 import Login from "./Login";
 import { adminApi, type AdminUser } from "./api";
-import NewsAdmin from "./pages/NewsAdmin";
-import ProductAdmin from "./pages/ProductAdmin";
-import FeedbackAdmin from "./pages/FeedbackAdmin";
-import SiteAdmin from "./pages/SiteAdmin";
-import UploadAdmin from "./pages/UploadAdmin";
-import UserAdmin from "./pages/UserAdmin";
 
-function Gate({
-	user,
-	onLogout,
-}: {
-	user: AdminUser;
-	onLogout: () => void;
-}) {
-	const ctx: AdminCtx = { user, onLogout };
-	return (
-		<AdminLayout>
-			<Outlet context={ctx} />
-		</AdminLayout>
-	);
-}
-
-export default function AdminApp() {
+// 会话检查（登录页与守卫共用）
+function useMe() {
 	const [user, setUser] = useState<AdminUser | null>(null);
 	const [checking, setChecking] = useState(true);
-	const navigate = useNavigate();
-
 	useEffect(() => {
 		adminApi
 			.me()
@@ -38,6 +18,22 @@ export default function AdminApp() {
 			.catch(() => setUser(null))
 			.finally(() => setChecking(false));
 	}, []);
+	return { user, setUser, checking };
+}
+
+/** /admin/login：未登录显示表单；已登录直接进后台 */
+export function AdminLogin() {
+	const { user, checking } = useMe();
+	const navigate = useNavigate();
+	if (checking) return <div className="admin-loading">加载中…</div>;
+	if (user) return <Navigate to="/admin/news" replace />;
+	return <Login onLogin={() => navigate("/admin/news")} />;
+}
+
+/** /admin/*：登录守卫 + 后台布局，子路由来自 App.tsx */
+export default function AdminApp() {
+	const { user, setUser, checking } = useMe();
+	const navigate = useNavigate();
 
 	const onLogout = async () => {
 		try {
@@ -50,33 +46,12 @@ export default function AdminApp() {
 	};
 
 	if (checking) return <div className="admin-loading">加载中…</div>;
+	if (!user) return <Navigate to="/admin/login" replace />;
 
+	const ctx: AdminCtx = { user, onLogout };
 	return (
-		<Routes>
-			<Route
-				path="/admin/login"
-				element={
-					user ? (
-						<Navigate to="/admin/news" replace />
-					) : (
-						<Login
-							onLogin={(u) => {
-								setUser(u);
-								navigate("/admin/news");
-							}}
-						/>
-					)
-				}
-			/>
-			<Route path="/admin" element={user ? <Gate user={user} onLogout={onLogout} /> : <Navigate to="/admin/login" replace />}>
-				<Route index element={<Navigate to="/admin/news" replace />} />
-				<Route path="news" element={<NewsAdmin />} />
-				<Route path="products" element={<ProductAdmin />} />
-				<Route path="feedback" element={<FeedbackAdmin />} />
-				<Route path="site" element={<SiteAdmin />} />
-				<Route path="upload" element={<UploadAdmin />} />
-				<Route path="users" element={<UserAdmin />} />
-			</Route>
-		</Routes>
+		<AdminLayout>
+			<Outlet context={ctx} />
+		</AdminLayout>
 	);
 }

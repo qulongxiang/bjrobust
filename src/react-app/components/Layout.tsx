@@ -8,7 +8,7 @@ const NAV = [
 	{ to: "/products", label: "产品中心" },
 	{ to: "/news", label: "新闻资讯" },
 	{ to: "/cases", label: "成功案例" },
-	{ to: "/about", label: "关于我们" },
+	{ to: "/about", label: "公司概况" },
 	{ to: "/contact", label: "联系我们" },
 ];
 

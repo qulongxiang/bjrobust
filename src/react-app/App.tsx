@@ -1,8 +1,16 @@
 // 应用路由：前台页面 + 后台管理（/admin）
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+// 后台用标准扁平路由结构：守卫组件作父路由 element，子页以 children 声明、<Outlet/> 渲染
+// （react-router 7 下 splat 路由内嵌套 <Routes> 不渲染，不能那样写）
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
-import AdminApp from "./admin/AdminApp";
+import AdminApp, { AdminLogin } from "./admin/AdminApp";
+import NewsAdmin from "./admin/pages/NewsAdmin";
+import ProductAdmin from "./admin/pages/ProductAdmin";
+import FeedbackAdmin from "./admin/pages/FeedbackAdmin";
+import SiteAdmin from "./admin/pages/SiteAdmin";
+import UploadAdmin from "./admin/pages/UploadAdmin";
+import UserAdmin from "./admin/pages/UserAdmin";
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -19,7 +27,19 @@ export default function App() {
 		<BrowserRouter>
 			<ScrollToTop />
 			<Routes>
-				<Route path="/admin/*" element={<AdminApp />} />
+				{/* 后台：独立布局，不用前台 Layout */}
+				<Route path="/admin/login" element={<AdminLogin />} />
+				<Route path="/admin" element={<AdminApp />}>
+					<Route index element={<Navigate to="/admin/news" replace />} />
+					<Route path="news" element={<NewsAdmin />} />
+					<Route path="products" element={<ProductAdmin />} />
+					<Route path="feedback" element={<FeedbackAdmin />} />
+					<Route path="site" element={<SiteAdmin />} />
+					<Route path="upload" element={<UploadAdmin />} />
+					<Route path="users" element={<UserAdmin />} />
+					<Route path="*" element={<Navigate to="/admin/news" replace />} />
+				</Route>
+				{/* 前台页面 */}
 				<Route element={<Layout />}>
 					<Route path="/" element={<Home />} />
 					<Route path="/products" element={<Products />} />

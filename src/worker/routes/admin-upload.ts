@@ -60,7 +60,7 @@ app.delete("/upload", async (c) => {
 
 // ---- 内页头图（R2 cn-banner/，对应原版 PHP 站 cn/banner/ 六个固定位） ----
 const BANNERS = [
-	{ name: "banner1.jpg", page: "关于我们" },
+	{ name: "banner1.jpg", page: "公司概况" },
 	{ name: "banner2.jpg", page: "产品中心" },
 	{ name: "banner3.jpg", page: "新闻资讯" },
 	{ name: "banner4.jpg", page: "成功案例" },
