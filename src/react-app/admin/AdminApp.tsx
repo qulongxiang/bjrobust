@@ -50,7 +50,8 @@ export default function AdminApp() {
 
 	const ctx: AdminCtx = { user, onLogout };
 	return (
-		<AdminLayout>
+		<AdminLayout user={user} onLogout={onLogout}>
+			{/* Outlet context 供子页面（如 UserAdmin）用 useOutletContext 读取 */}
 			<Outlet context={ctx} />
 		</AdminLayout>
 	);

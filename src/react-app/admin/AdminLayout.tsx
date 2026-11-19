@@ -1,5 +1,7 @@
 // 后台布局：侧边栏导航 + 主区域
-import { NavLink, useOutletContext } from "react-router-dom";
+// 注意：user/onLogout 必须走 props——本组件在 <Outlet> 之外，
+// 这里调 useOutletContext() 会返回 null，解构直接抛错导致整个后台白屏（子页面在 Outlet 内部可正常使用）
+import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { AdminUser } from "./api";
 import "./admin.css";
@@ -18,8 +20,15 @@ export type AdminCtx = {
 	onLogout: () => void;
 };
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
-	const { user, onLogout } = useOutletContext<AdminCtx>();
+export default function AdminLayout({
+	user,
+	onLogout,
+	children,
+}: {
+	user: AdminUser;
+	onLogout: () => void;
+	children: ReactNode;
+}) {
 	return (
 		<div className="admin-layout">
 			<aside className="admin-side">

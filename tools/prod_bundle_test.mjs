@@ -1,6 +1,7 @@
 // 用真实部署的 bundle 在 happy-dom 环境跑指定页面完整流程（真实 API），验证渲染
 // 用法: node tools/prod_bundle_test.mjs [origin] [page]
 //   默认: https://bjrobust.qlxtools.asia  /admin/login
+//   FAKE_ME=1  假登录态：/api/admin/me 返回假 200 用户（测登录后页面），其余仍走真实 API
 import { Window } from "happy-dom";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -34,8 +35,24 @@ g.requestAnimationFrame =
 g.cancelAnimationFrame = w.cancelAnimationFrame ? w.cancelAnimationFrame.bind(w) : (h) => clearTimeout(h);
 
 // fetch：相对路径 → 生产真实 API（先保存 Node 原生 fetch，避免自引用递归）
+const FAKE_ME = process.env.FAKE_ME === "1";
 const nodeFetch = globalThis.fetch.bind(globalThis);
-const realFetch = (input, init) => nodeFetch(new URL(String(input), ORIGIN).toString(), init);
+const realFetch = (input, init) => {
+	const url = new URL(String(input), ORIGIN).toString();
+	// 假登录态：/api/admin/me 直接返回 200 假用户，其余请求仍走生产真实 API
+	if (FAKE_ME && url === ORIGIN + "/api/admin/me") {
+		return Promise.resolve(
+			new Response(
+				JSON.stringify({
+					ok: true,
+					user: { id: 1, UserName: "admin", UserRole: "1", UserRoleCalled: "管理员" },
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			),
+		);
+	}
+	return nodeFetch(url, init);
+};
 g.fetch = realFetch;
 w.fetch = realFetch;
 
