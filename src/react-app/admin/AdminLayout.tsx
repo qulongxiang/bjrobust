@@ -7,6 +7,7 @@ import type { AdminUser } from "./api";
 import "./admin.css";
 
 const MENUS = [
+	{ to: "/admin/stats", label: "数据统计" },
 	{ to: "/admin/news", label: "新闻/案例" },
 	{ to: "/admin/products", label: "产品管理" },
 	{ to: "/admin/feedback", label: "留言管理" },

@@ -167,6 +167,20 @@ export const adminApi = {
 	setUserLock: (id: number, locked: number) =>
 		req<{ ok: boolean }>(`/api/admin/users/${id}/lock`, { method: "PUT", body: j({ locked }) }),
 
+	addUser: (b: { username: string; password: string; called?: string }) =>
+		req<{ ok: boolean; id: number }>("/api/admin/users", { method: "POST", body: j(b) }),
+
+	stats: () =>
+		req<{
+			ok: boolean;
+			news: number;
+			products: number;
+			feedback: number;
+			logTotal: number;
+			hits: number;
+			recentLog: { id: number; ip: string; time: string; description: string }[];
+		}>("/api/admin/stats"),
+
 	bannerList: () =>
 		req<{ ok: boolean; items: { name: string; page: string; url: string; size: number; updated: string | null }[] }>(
 			"/api/admin/banners",

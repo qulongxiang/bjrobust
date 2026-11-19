@@ -138,6 +138,88 @@ app.get("/users", async (c) => {
 	});
 });
 
+// 添加管理员（对应旧后台 member/sys_useradd：仅超管可操作，角色继承创建者，密码存 bcrypt）
+app.post("/users", async (c) => {
+	const db = c.env.DB;
+	const me = c.get("admin");
+	if (!isSuper(me)) return c.json({ error: "只有超级管理员可以添加管理员" }, 403);
+	const b = await c.req.json().catch(() => null);
+	const username = String(b?.username ?? "").trim().slice(0, 50);
+	const password = String(b?.password ?? "");
+	const called = String(b?.called ?? "").trim().slice(0, 50) || username;
+	if (!username) return c.json({ error: "用户名不能为空" }, 400);
+	if (password.length < 6) return c.json({ error: "密码至少 6 位" }, 400);
+	const exists = await db.prepare("SELECT id FROM t_admin WHERE UserName = ?").bind(username).first();
+	if (exists) return c.json({ error: "用户名已存在" }, 400);
+	const hash = await bcrypt.hash(password, 10);
+	const res = await exec(
+		db.prepare(
+			"INSERT INTO t_admin (UserName, PassWord, IsLock, UserCalled, UserRole, UserRoleCalled, UserId, Space, DataBase, ServiceStart, ServiceEnd, IsPointing, Industry, Key, IsCase, Amount, UserType, DbName, RedirectUrl, Status, SiteType, DesignContact, area, coder, designer, infoer, PointDate, SalesMan, LoginTime, ServerName, ServerTel, ServerQQ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		),
+		username,
+		hash,
+		0,
+		called,
+		me.UserRole,
+		me.UserRoleCalled,
+		0,
+		0,
+		0,
+		nowSql(),
+		"2099-12-31 00:00:00",
+		"0",
+		0,
+		"",
+		0,
+		"0",
+		2,
+		"",
+		"",
+		0,
+		0,
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+	);
+	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
+});
+
+// ---- 数据统计（内容/浏览概览 + 原系统操作日志 t_log） ----
+app.get("/stats", async (c) => {
+	const db = c.env.DB;
+	const [news, products, feedback, logTotal, newsHits, proHits, recentLog] = await Promise.all([
+		count(db.prepare("SELECT COUNT(*) AS n FROM t_news")),
+		count(db.prepare("SELECT COUNT(*) AS n FROM t_products")),
+		count(db.prepare("SELECT COUNT(*) AS n FROM t_feedback")),
+		count(db.prepare("SELECT COUNT(*) AS n FROM t_log")),
+		count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_news")),
+		count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_products")),
+		rows(db.prepare("SELECT id, IP, Time, Description FROM t_log ORDER BY id DESC LIMIT 20")),
+	]);
+	return c.json({
+		ok: true,
+		news,
+		products,
+		feedback,
+		logTotal,
+		hits: newsHits + proHits,
+		recentLog: recentLog.map((r) => ({
+			id: Number(r.id),
+			ip: String(r.IP ?? ""),
+			time: String(r.Time ?? ""),
+			description: String(r.Description ?? ""),
+		})),
+	});
+});
+
 app.put("/users/:id/password", async (c) => {
 	const db = c.env.DB;
 	const id = Number(c.req.param("id"));

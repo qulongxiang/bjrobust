@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
 import AdminApp, { AdminLogin } from "./admin/AdminApp";
+import StatsAdmin from "./admin/pages/StatsAdmin";
 import NewsAdmin from "./admin/pages/NewsAdmin";
 import ProductAdmin from "./admin/pages/ProductAdmin";
 import FeedbackAdmin from "./admin/pages/FeedbackAdmin";
@@ -30,7 +31,8 @@ export default function App() {
 				{/* 后台：独立布局，不用前台 Layout */}
 				<Route path="/admin/login" element={<AdminLogin />} />
 				<Route path="/admin" element={<AdminApp />}>
-					<Route index element={<Navigate to="/admin/news" replace />} />
+					<Route index element={<Navigate to="/admin/stats" replace />} />
+					<Route path="stats" element={<StatsAdmin />} />
 					<Route path="news" element={<NewsAdmin />} />
 					<Route path="products" element={<ProductAdmin />} />
 					<Route path="feedback" element={<FeedbackAdmin />} />

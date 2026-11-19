@@ -11,6 +11,10 @@ export default function UserAdmin() {
 	const [pwdFor, setPwdFor] = useState<AdminUserRow | null>(null);
 	const [pwd, setPwd] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [adding, setAdding] = useState(false);
+	const [aUser, setAUser] = useState("");
+	const [aPwd, setAPwd] = useState("");
+	const [aCalled, setACalled] = useState("");
 
 	const flash = (ok: boolean, text: string) => {
 		setMsg({ ok, text });
@@ -45,6 +49,32 @@ export default function UserAdmin() {
 		}
 	};
 
+	const addUser = async () => {
+		if (!aUser.trim()) {
+			flash(false, "用户名不能为空");
+			return;
+		}
+		if (aPwd.length < 6) {
+			flash(false, "密码至少 6 位");
+			return;
+		}
+		setBusy(true);
+		try {
+			await adminApi.addUser({ username: aUser.trim(), password: aPwd, called: aCalled.trim() });
+			flash(true, "管理员已添加");
+			setAdding(false);
+			setAUser("");
+			setAPwd("");
+			setACalled("");
+			const d = await adminApi.users();
+			setItems(d.items);
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "添加失败");
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	const toggleLock = async (u: AdminUserRow) => {
 		try {
 			await adminApi.setUserLock(u.id, u.isLock ? 0 : 1);
@@ -60,6 +90,11 @@ export default function UserAdmin() {
 		<div>
 			<div className="admin-page-head">
 				<h2>用户管理</h2>
+				{isSuper ? (
+					<button className="btn primary" onClick={() => setAdding(true)}>
+						+ 添加管理员
+					</button>
+				) : null}
 			</div>
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
@@ -102,8 +137,36 @@ export default function UserAdmin() {
 				</tbody>
 			</table>
 
+			{adding ? (
+			 <div className="modal-mask" onClick={() => !busy && setAdding(false)}>
+			  <div className="modal" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+			   <h3>添加管理员</h3>
+			   <div className="admin-field">
+			    <label>用户名</label>
+			    <input value={aUser} onChange={(e) => setAUser(e.target.value)} autoFocus placeholder="登录用户名" />
+			   </div>
+			   <div className="admin-field">
+			    <label>姓名（显示用，可留空）</label>
+			    <input value={aCalled} onChange={(e) => setACalled(e.target.value)} placeholder="如：张三" />
+			   </div>
+			   <div className="admin-field">
+			    <label>密码（至少 6 位）</label>
+			    <input type="password" value={aPwd} onChange={(e) => setAPwd(e.target.value)} />
+			   </div>
+			   <div className="modal-foot">
+			    <button className="btn" disabled={busy} onClick={() => setAdding(false)}>
+			     取消
+			    </button>
+			    <button className="btn primary" disabled={busy} onClick={addUser}>
+			     {busy ? "提交中…" : "确认添加"}
+			    </button>
+			   </div>
+			  </div>
+			 </div>
+			) : null}
+
 			{pwdFor ? (
-				<div className="modal-mask" onClick={() => !busy && setPwdFor(null)}>
+			 <div className="modal-mask" onClick={() => !busy && setPwdFor(null)}>
 					<div className="modal" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
 						<h3>重置密码：{pwdFor.userName}</h3>
 						<div className="admin-field">

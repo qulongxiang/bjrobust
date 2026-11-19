@@ -26,8 +26,8 @@ export function AdminLogin() {
 	const { user, checking } = useMe();
 	const navigate = useNavigate();
 	if (checking) return <div className="admin-loading">加载中…</div>;
-	if (user) return <Navigate to="/admin/news" replace />;
-	return <Login onLogin={() => navigate("/admin/news")} />;
+	if (user) return <Navigate to="/admin/stats" replace />;
+	return <Login onLogin={() => navigate("/admin/stats")} />;
 }
 
 /** /admin/*：登录守卫 + 后台布局，子路由来自 App.tsx */
