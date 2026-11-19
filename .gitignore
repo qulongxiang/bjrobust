@@ -202,3 +202,4 @@ dist
 migrate.sql
 tools/data.json
 .browsers/
+tools/.prod_bundle.mjs
