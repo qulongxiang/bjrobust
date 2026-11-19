@@ -1,13 +1,14 @@
 // 应用路由：前台页面 + 后台管理（/admin）
 // 后台用标准扁平路由结构：守卫组件作父路由 element，子页以 children 声明、<Outlet/> 渲染
 // （react-router 7 下 splat 路由内嵌套 <Routes> 不渲染，不能那样写）
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
 import AdminApp, { AdminLogin } from "./admin/AdminApp";
 import StatsAdmin from "./admin/pages/StatsAdmin";
 import NewsAdmin from "./admin/pages/NewsAdmin";
 import ProductAdmin from "./admin/pages/ProductAdmin";
+import ProductsTypes from "./admin/pages/ProductsTypes";
 import FeedbackAdmin from "./admin/pages/FeedbackAdmin";
 import SiteAdmin from "./admin/pages/SiteAdmin";
 import UploadAdmin from "./admin/pages/UploadAdmin";
@@ -34,7 +35,11 @@ export default function App() {
 					<Route index element={<Navigate to="/admin/stats" replace />} />
 					<Route path="stats" element={<StatsAdmin />} />
 					<Route path="news" element={<NewsAdmin />} />
-					<Route path="products" element={<ProductAdmin />} />
+					<Route path="products" element={<Outlet />}>
+						<Route index element={<Navigate to="/admin/products/list" replace />} />
+						<Route path="list" element={<ProductAdmin />} />
+						<Route path="types" element={<ProductsTypes />} />
+					</Route>
 					<Route path="feedback" element={<FeedbackAdmin />} />
 					<Route path="site" element={<SiteAdmin />} />
 					<Route path="upload" element={<UploadAdmin />} />

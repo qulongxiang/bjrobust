@@ -119,8 +119,9 @@ export const adminApi = {
 	logout: () => req<{ ok: boolean }>("/api/admin/logout", { method: "POST" }),
 
 	newsTypes: () => req<{ ok: boolean; items: { id: number; name: string }[] }>("/api/admin/news-types"),
+	// 注意：? 必须始终存在——无 ? 时 &page=... 会被当作路径的一部分导致路由 404
 	news: (type?: number, page = 1) =>
-		req<Paged<AdminNews>>(`/api/admin/news${type ? `?type=${type}` : ""}&page=${page}&pageSize=20`),
+		req<Paged<AdminNews>>(`/api/admin/news?page=${page}&pageSize=20${type ? `&type=${type}` : ""}`),
 	addNews: (b: Partial<AdminNews>) => req<{ ok: boolean; id: number }>("/api/admin/news", { method: "POST", body: j(b) }),
 	updateNews: (id: number, b: Partial<AdminNews>) => req<{ ok: boolean }>(`/api/admin/news/${id}`, { method: "PUT", body: j(b) }),
 	delNews: (id: number) => req<{ ok: boolean }>(`/api/admin/news/${id}`, { method: "DELETE" }),
@@ -129,7 +130,7 @@ export const adminApi = {
 	delNewsType: (id: number) => req<{ ok: boolean }>(`/api/admin/news-types/${id}`, { method: "DELETE" }),
 
 	products: (typeId?: number, page = 1) =>
-		req<Paged<AdminProduct>>(`/api/admin/products${typeId ? `?typeId=${typeId}` : ""}&page=${page}&pageSize=20`),
+		req<Paged<AdminProduct>>(`/api/admin/products?page=${page}&pageSize=20${typeId ? `&typeId=${typeId}` : ""}`),
 	addProduct: (b: Partial<AdminProduct>) =>
 		req<{ ok: boolean; id: number }>("/api/admin/products", { method: "POST", body: j(b) }),
 	updateProduct: (id: number, b: Partial<AdminProduct>) =>
@@ -179,6 +180,10 @@ export const adminApi = {
 			logTotal: number;
 			hits: number;
 			recentLog: { id: number; ip: string; time: string; description: string }[];
+			productStats: {
+				byType: { id: number; name: string; count: number }[];
+				top: { id: number; name: string; typeName: string; hits: number }[];
+			};
 		}>("/api/admin/stats"),
 
 	bannerList: () =>

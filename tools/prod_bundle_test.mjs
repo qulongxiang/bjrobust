@@ -75,7 +75,26 @@ const realFetch = (input, init) => {
 	if (sessionCookie) {
 		init = { ...(init || {}), headers: { ...(init?.headers || {}), cookie: sessionCookie } };
 	}
-	return nodeFetch(url, init);
+	const t0 = Date.now();
+	return nodeFetch(url, init)
+		.then((r) => {
+			if (url.includes("/api/admin/")) {
+				console.log(`[api ${r.status} +${Date.now() - t0}ms] ${init?.method ?? "GET"} ${url}`);
+			}
+			if (r.status >= 400) {
+				console.log(`[fetch ${r.status}] ${init?.method ?? "GET"} ${url}`);
+			}
+			if (url.includes("/api/admin/news")) {
+				r.clone()
+					.text()
+					.then((t) => console.log("[news-body " + r.status + "] " + t.slice(0, 220)));
+			}
+			return r;
+		})
+		.catch((err) => {
+			console.log(`[fetch-fail] ${init?.method ?? "GET"} ${url} :: ${err?.cause?.code ?? err?.message ?? err}`);
+			throw err;
+		});
 };
 g.fetch = realFetch;
 w.fetch = realFetch;
@@ -108,7 +127,8 @@ try {
 } catch (e) {
 	errors.push("bundle import 失败: " + e.message);
 }
-await new Promise((r) => setTimeout(r, 5000));
+// 15s：生产新闻列表响应体 ~1.6MB，慢网时需要更长时间才能全部到达
+await new Promise((r) => setTimeout(r, 15000));
 
 const root = w.document.getElementById("root");
 console.log("\n==== /admin/login 渲染结果 ====");

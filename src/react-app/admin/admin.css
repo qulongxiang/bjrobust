@@ -139,6 +139,12 @@
 	font-weight: 600;
 }
 
+.admin-nav .admin-sub {
+	padding: 8px 14px 8px 30px;
+	font-size: 13px;
+	color: #9aa7bd;
+}
+
 .admin-back {
 	margin-top: 10px;
 	opacity: 0.75;

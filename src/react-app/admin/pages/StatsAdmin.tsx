@@ -9,6 +9,10 @@ type Stats = {
 	logTotal: number;
 	hits: number;
 	recentLog: { id: number; ip: string; time: string; description: string }[];
+	productStats: {
+		byType: { id: number; name: string; count: number }[];
+		top: { id: number; name: string; typeName: string; hits: number }[];
+	};
 };
 
 export default function StatsAdmin() {
@@ -63,6 +67,57 @@ export default function StatsAdmin() {
 						<div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>{c.label}</div>
 					</div>
 				))}
+			</div>
+			<h3 style={{ margin: "18px 0 8px", fontSize: 15 }}>产品统计</h3>
+			<div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+				<div style={{ flex: "1 1 280px", minWidth: 260 }}>
+					<div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>各分类产品数</div>
+					{data.productStats.byType.length ? (
+						<table className="admin-table">
+							<thead>
+								<tr>
+									<th>分类</th>
+									<th>产品数</th>
+								</tr>
+							</thead>
+							<tbody>
+								{data.productStats.byType.map((t) => (
+									<tr key={t.id}>
+										<td>{t.name}</td>
+										<td>{t.count}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					) : (
+						<div className="empty-tip">暂无数据</div>
+					)}
+				</div>
+				<div style={{ flex: "1 1 340px", minWidth: 300 }}>
+					<div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>产品浏览 Top 10</div>
+					{data.productStats.top.length ? (
+						<table className="admin-table">
+							<thead>
+								<tr>
+									<th>产品</th>
+									<th>分类</th>
+									<th>浏览</th>
+								</tr>
+							</thead>
+							<tbody>
+								{data.productStats.top.map((p) => (
+									<tr key={p.id}>
+										<td>{p.name}</td>
+										<td className="muted">{p.typeName}</td>
+										<td>{p.hits}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					) : (
+						<div className="empty-tip">暂无数据</div>
+					)}
+				</div>
 			</div>
 			<h3 style={{ margin: "18px 0 8px", fontSize: 15 }}>最近操作记录（原系统日志）</h3>
 			{data.recentLog.length ? (

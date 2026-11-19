@@ -195,15 +195,31 @@ app.post("/users", async (c) => {
 // ---- 数据统计（内容/浏览概览 + 原系统操作日志 t_log） ----
 app.get("/stats", async (c) => {
 	const db = c.env.DB;
-	const [news, products, feedback, logTotal, newsHits, proHits, recentLog] = await Promise.all([
-		count(db.prepare("SELECT COUNT(*) AS n FROM t_news")),
-		count(db.prepare("SELECT COUNT(*) AS n FROM t_products")),
-		count(db.prepare("SELECT COUNT(*) AS n FROM t_feedback")),
-		count(db.prepare("SELECT COUNT(*) AS n FROM t_log")),
-		count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_news")),
-		count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_products")),
-		rows(db.prepare("SELECT id, IP, Time, Description FROM t_log ORDER BY id DESC LIMIT 20")),
-	]);
+	const [news, products, feedback, logTotal, newsHits, proHits, recentLog, proByType, typeRows, topProducts] =
+		await Promise.all([
+			count(db.prepare("SELECT COUNT(*) AS n FROM t_news")),
+			count(db.prepare("SELECT COUNT(*) AS n FROM t_products")),
+			count(db.prepare("SELECT COUNT(*) AS n FROM t_feedback")),
+			count(db.prepare("SELECT COUNT(*) AS n FROM t_log")),
+			count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_news")),
+			count(db.prepare("SELECT COALESCE(SUM(Hits), 0) AS n FROM t_products")),
+			rows(db.prepare("SELECT id, IP, Time, Description FROM t_log ORDER BY id DESC LIMIT 20")),
+			rows(db.prepare("SELECT TypeID AS typeId, COUNT(*) AS n FROM t_products GROUP BY TypeID")),
+			rows(db.prepare("SELECT id, Called FROM t_protype")),
+			rows(
+				db.prepare(
+					"SELECT p.id, p.ProName AS name, p.Hits AS hits, pt.Called AS typeName FROM t_products p LEFT JOIN t_protype pt ON pt.id = p.TypeID ORDER BY p.Hits DESC, p.OrderBy DESC LIMIT 10",
+				),
+			),
+		]);
+	const typeNames = new Map(typeRows.map((r) => [Number(r.id), String(r.Called ?? "")]));
+	const byType = proByType
+		.map((r) => ({
+			id: Number(r.typeId),
+			name: typeNames.get(Number(r.typeId)) || (Number(r.typeId) ? `#${r.typeId}` : "未分类"),
+			count: Number(r.n),
+		}))
+		.sort((a, b) => b.count - a.count || a.id - b.id);
 	return c.json({
 		ok: true,
 		news,
@@ -217,6 +233,15 @@ app.get("/stats", async (c) => {
 			time: String(r.Time ?? ""),
 			description: String(r.Description ?? ""),
 		})),
+		productStats: {
+			byType,
+			top: topProducts.map((r) => ({
+				id: Number(r.id),
+				name: String(r.name ?? ""),
+				typeName: String(r.typeName ?? "") || "未分类",
+				hits: Number(r.hits ?? 0),
+			})),
+		},
 	});
 });
 

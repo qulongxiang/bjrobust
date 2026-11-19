@@ -129,7 +129,7 @@ export default function ProductAdmin() {
 	return (
 		<div>
 			<div className="admin-page-head">
-				<h2>产品管理</h2>
+				<h2>产品列表</h2>
 				<button className="btn primary" onClick={() => setEditing({ ...EMPTY, typeId: typeId || 0 })}>
 					+ 新增产品
 				</button>
