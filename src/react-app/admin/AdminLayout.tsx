@@ -53,8 +53,9 @@ export default function AdminLayout({
 					{MENUS.map((m) =>
 						m.children ? (
 							<div key={m.to} className="admin-menu-group">
-								<NavLink to={m.to} className={`group-label${location.pathname.startsWith(m.to) ? " on" : ""}`}>
+								<NavLink to={m.to} className={`group-parent${location.pathname.startsWith(m.to) ? " on" : ""}`}>
 									{m.label}
+									<span className="group-caret">▾</span>
 								</NavLink>
 								{m.children.map((ch) => (
 									<NavLink key={ch.to} to={ch.to} className={({ isActive }) => `admin-sub${isActive ? " on" : ""}`}>

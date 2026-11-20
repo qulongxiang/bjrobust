@@ -139,32 +139,19 @@
 	font-weight: 600;
 }
 
-/* 二级菜单层级：父级是"分组标签"（小号弱化，与顶级条目区分），子项深缩进 + 左侧竖线 */
-.admin-nav .group-label {
-	padding: 8px 14px 4px;
-	font-size: 12px;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-	color: #7c89a1;
-	border-radius: 0;
-}
-
-.admin-nav .group-label:hover {
-	background: transparent;
-	color: #b9c6da;
-}
-
-.admin-nav .group-label.on {
-	background: transparent;
-	color: #dce6f5;
+/* 二级菜单：父项与顶级条目同样式（右侧带展开箭头），子项缩进 + 左侧竖线（旧后台树形菜单效果） */
+.admin-nav .group-caret {
+	float: right;
+	font-size: 10px;
+	opacity: 0.65;
 }
 
 .admin-nav .admin-sub {
-	margin: 0 10px 2px 22px;
+	margin: 0 10px 2px 20px;
 	padding: 9px 14px;
 	font-size: 13.5px;
 	color: #a8b4c9;
-	border-left: 2px solid rgba(255, 255, 255, 0.14);
+	border-left: 2px solid rgba(255, 255, 255, 0.28);
 	border-radius: 0 8px 8px 0;
 }
 
@@ -550,41 +537,7 @@
 	color: #14508c;
 }
 
-@media (max-width: 800px) {
-	.admin-layout {
-		flex-direction: column;
-	}
-
-	.admin-side {
-		width: 100%;
-		height: auto;
-		position: static;
-	}
-
-	.admin-nav {
-		flex-direction: row;
-		flex-wrap: wrap;
-	}
-
-	/* 窄屏横向导航：菜单组独占一行，组标签弱化在前、子项横排 */
-	.admin-menu-group {
-		flex: 1 1 100%;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-
-	.admin-nav .group-label {
-		margin: 0 8px 0 0;
-	}
-
-	.admin-nav .admin-sub {
-		margin: 0 8px 4px 0;
-		border-left: none;
-		border-radius: 8px;
-	}
-}
+/* 侧栏导航在所有宽度下保持纵向树形（≤800px 不再切横向——横向折行会破坏父子层级） */
 
 /* 内页头图管理 */
 .banner-grid {
