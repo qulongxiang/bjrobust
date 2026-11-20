@@ -52,7 +52,7 @@ export default function AdminLayout({
 					{MENUS.map((m) =>
 						m.children ? (
 							<div key={m.to} className="admin-menu-group">
-								<NavLink to={m.to} className={location.pathname.startsWith(m.to) ? "on" : ""}>
+								<NavLink to={m.to} className={`group-label${location.pathname.startsWith(m.to) ? " on" : ""}`}>
 									{m.label}
 								</NavLink>
 								{m.children.map((ch) => (

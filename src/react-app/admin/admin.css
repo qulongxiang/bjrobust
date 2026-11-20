@@ -139,10 +139,40 @@
 	font-weight: 600;
 }
 
+/* 二级菜单层级：父级是"分组标签"（小号弱化，与顶级条目区分），子项深缩进 + 左侧竖线 */
+.admin-nav .group-label {
+	padding: 8px 14px 4px;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	color: #7c89a1;
+	border-radius: 0;
+}
+
+.admin-nav .group-label:hover {
+	background: transparent;
+	color: #b9c6da;
+}
+
+.admin-nav .group-label.on {
+	background: transparent;
+	color: #dce6f5;
+}
+
 .admin-nav .admin-sub {
-	padding: 8px 14px 8px 30px;
-	font-size: 13px;
-	color: #9aa7bd;
+	margin: 0 10px 2px 22px;
+	padding: 9px 14px;
+	font-size: 13.5px;
+	color: #a8b4c9;
+	border-left: 2px solid rgba(255, 255, 255, 0.14);
+	border-radius: 0 8px 8px 0;
+}
+
+.admin-nav .admin-sub.on {
+	background: #14508c;
+	border-left-color: transparent;
+	color: #fff;
+	font-weight: 600;
 }
 
 .admin-back {
