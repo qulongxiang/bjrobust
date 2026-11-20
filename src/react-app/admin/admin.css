@@ -122,10 +122,14 @@
 }
 
 .admin-nav a {
+	/* 必须是 block：<a> 默认 inline，菜单组 div 内的子菜单会横向并排流动、
+	窄容器中断词折行（"产品列/表"），父子层级全毁 */
+	display: block;
 	padding: 10px 14px;
 	border-radius: 8px;
 	font-size: 14px;
 	color: #c7d2e2;
+	text-decoration: none;
 }
 
 .admin-nav a:hover {
@@ -160,6 +164,13 @@
 	border-left-color: transparent;
 	color: #fff;
 	font-weight: 600;
+}
+
+.admin-ver {
+	font-size: 11px;
+	color: #5b6b82;
+	text-align: center;
+	padding: 6px 0 4px;
 }
 
 .admin-back {

@@ -53,7 +53,8 @@ export default function AdminLayout({
 					{MENUS.map((m) =>
 						m.children ? (
 							<div key={m.to} className="admin-menu-group">
-								<NavLink to={m.to} className={`group-parent${location.pathname.startsWith(m.to) ? " on" : ""}`}>
+								{/* 父项仅在精确命中时高亮（实际总会跳到子页），避免父子两项同时蓝底 */}
+								<NavLink to={m.to} className={`group-parent${location.pathname === m.to ? " on" : ""}`}>
 									{m.label}
 									<span className="group-caret">▾</span>
 								</NavLink>
@@ -80,6 +81,9 @@ export default function AdminLayout({
 					<button className="admin-logout" onClick={onLogout}>
 						退出登录
 					</button>
+					<div className="admin-ver" title="前端版本（强刷后核对是否为此版本号）">
+						v{__APP_VERSION__}
+					</div>
 				</div>
 			</aside>
 			<main className="admin-main">{children}</main>
