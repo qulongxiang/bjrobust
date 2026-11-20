@@ -565,6 +565,25 @@
 		flex-direction: row;
 		flex-wrap: wrap;
 	}
+
+	/* 窄屏横向导航：菜单组独占一行，组标签弱化在前、子项横排 */
+	.admin-menu-group {
+		flex: 1 1 100%;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.admin-nav .group-label {
+		margin: 0 8px 0 0;
+	}
+
+	.admin-nav .admin-sub {
+		margin: 0 8px 4px 0;
+		border-left: none;
+		border-radius: 8px;
+	}
 }
 
 /* 内页头图管理 */

@@ -1,25 +1,7 @@
 // 产品管理（t_products + t_protype + t_img）：分类筛选 + 列表 + 编辑弹框 + 图集弹框
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { adminApi, type AdminProduct, type ProType } from "../api";
-
-const EMPTY: AdminProduct = {
-	id: 0,
-	name: "",
-	content: "",
-	memo: "",
-	noteTime: "",
-	smallPic: "",
-	isShow: 1,
-	isCommend: 0,
-	order: 0,
-	typeId: 0,
-	hits: 0,
-	webTitle: "",
-	webKey: "",
-	webDesc: "",
-	bh: "",
-	bz: "",
-};
 
 export default function ProductAdmin() {
 	const [types, setTypes] = useState<ProType[]>([]);
@@ -34,6 +16,7 @@ export default function ProductAdmin() {
 	const [newPid, setNewPid] = useState(0);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 	const [busy, setBusy] = useState(false);
+	const nav = useNavigate();
 
 	const flash = (ok: boolean, text: string) => {
 		setMsg({ ok, text });
@@ -130,7 +113,7 @@ export default function ProductAdmin() {
 		<div>
 			<div className="admin-page-head">
 				<h2>产品列表</h2>
-				<button className="btn primary" onClick={() => setEditing({ ...EMPTY, typeId: typeId || 0 })}>
+				<button className="btn primary" onClick={() => nav("/admin/products/add")}>
 					+ 新增产品
 				</button>
 			</div>
@@ -313,6 +296,16 @@ export default function ProductAdmin() {
 								onChange={(e) => setEditing({ ...editing, smallPic: e.target.value })}
 								placeholder="/upload/xxx.jpg"
 							/>
+						</div>
+						<div className="admin-row">
+							<div className="admin-field">
+								<label>编号（BH）</label>
+								<input value={editing.bh} onChange={(e) => setEditing({ ...editing, bh: e.target.value })} placeholder="产品编号" />
+							</div>
+							<div className="admin-field">
+								<label>标准（BZ）</label>
+								<input value={editing.bz} onChange={(e) => setEditing({ ...editing, bz: e.target.value })} placeholder="执行标准" />
+							</div>
 						</div>
 						<div className="admin-row">
 							<div className="admin-field">

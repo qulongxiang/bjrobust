@@ -17,6 +17,7 @@ const MENUS: MenuItem[] = [
 		label: "产品管理",
 		children: [
 			{ to: "/admin/products/list", label: "产品列表" },
+			{ to: "/admin/products/add", label: "产品添加" },
 			{ to: "/admin/products/types", label: "产品分类" },
 		],
 	},
