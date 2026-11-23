@@ -27,10 +27,10 @@
 
 其它约定：
 
-- 图片按站点分目录，且再按日期分层：`upload/<code>/<YYYY>/<MM>/<DD>/<文件名>`（普通图片）、`cn-banner/<code>/<YYYY>/<MM>/<DD>/<文件名>`（内页头图）。bjrobust 的历史图片已全部迁到这个结构下（详见 6.5），新站点不会串图。
+- 图片按站点分目录，桶根第一层就是站点 Code，站点目录下再分类型与日期：`<code>/upload/<YYYY>/<MM>/<DD>/<文件名>`（普通图片）、`<code>/cn-banner/<YYYY>/<MM>/<DD>/<文件名>`（内页头图）。bjrobust 的历史图片已全部迁到这个结构下（详见 6.5），新站点不会串图。
 - 内页头图（公司概况/产品中心/新闻资讯/成功案例/技术支持/联系我们）是**按站点逐页配置**的：`t_banner` 里 `SiteId + Page` 唯一，图片键写在 `Pic`。
   - 后台「站点设置 → 内页头图」可以逐页上传替换，也可以「清除」让该页退回主题色渐变；
-  - 上传的新图落到 `cn-banner/<code>/<page>.<ext>`，不会覆盖别站、也不会覆盖 bjrobust 的历史文件名；
+  - 上传的新图落到 `<code>/cn-banner/<年>/<月>/<日>/<page>.<ext>`，不会覆盖别站、也不会覆盖 bjrobust 的历史文件名；
   - 新建站点默认没有头图记录，前台显示主题渐变，等你在后台逐页上传即可；
   - bjrobust 迁移时已经把老的 `cn-banner/banner1..6.jpg` 写进表里，视觉与改造前一致。
 - 站点标识 `Code` 只允许小写字母/数字/短横线，创建后不可改（它是 R2 的路径前缀）。
@@ -122,7 +122,7 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 
 - 数据：`t_banner` 每站每页一行（`SiteId + Page` 唯一），字段 `Pic` 存 R2 键；`Pic` 为空即"该页不配图"。
 - 页面键固定 6 个（顺序即菜单顺序）：`about` 公司概况、`products` 产品中心、`news` 新闻资讯、`cases` 成功案例、`support` 技术支持、`contact` 联系我们。
-- 上传落 `cn-banner/<站点Code>/<page>.<扩展名>`；替换同一页会覆盖同名对象；只校验文件头（jpg/png/gif/webp），单文件上限 5MB。
+- 上传落 `<站点Code>/cn-banner/<年>/<月>/<日>/<page>.<扩展名>`；同一天内替换同一页会覆盖同名对象；只校验文件头（jpg/png/gif/webp），单文件上限 5MB。
 - 前台：`GET /api/site/banners` 一次返回本站所有页面图，`PageHero` 按 `page` 取图；**取不到图时整块 banner 区域不渲染**（不会留渐变占位），页面直接从标题栏开始。
 - 后台本站维护：`/admin/site` 的"内页头图"面板（`GET/PUT/DELETE /api/admin/banners[/:page]`），操作的是"当前生效站点"。
 - 后台跨站维护（超管）：在 `/admin/platform` 的站点列表里点某站的**"素材维护"**，展开该站的头图 + 首页轮播面板（行=6 个菜单页，可上传/替换/清除）。
@@ -134,7 +134,7 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 
 ## 6.1 首页 banner 轮播（`t_slide`）
 
-- 首页那组滚动图原来挂在 `t_news NewType=1` 上，后台无处可改；现在独立成表 `t_slide`：`SiteId / Pic / Title / Link / OrderBy / IsShow / NoteTime`，`Pic` 同样存 R2 键（如 `upload/aaaa/x.jpg`，bjrobust 兼容老的裸文件名）。
+- 首页那组滚动图原来挂在 `t_news NewType=1` 上，后台无处可改；现在独立成表 `t_slide`：`SiteId / Pic / Title / Link / OrderBy / IsShow / NoteTime`，`Pic` 同样存 R2 键（如 `aaaa/upload/2026/11/23/x.jpg`）。
 - 前台 `GET /api/site/home` 的 `banners` 先读 `t_slide`（只取 `IsShow=1`，按 `OrderBy` 升序），表里没有数据才回退老的 `t_news` 逻辑；`aaaa`/`bbbb` 两站没配就没有轮播区。
 - 迁移脚本 `tools/migrate_multisite.mjs` 建表后会把每站 `t_news NewType=1 且 SmallPic<>''` 的记录搬进 `t_slide`，只搬一次（`NoteTime` 作标记）。线上 bjrobust 已搬入 4 张。
 - 维护入口两处，读写同一张表：
@@ -163,24 +163,32 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 重置密码/锁定：本人可改自己，本站账号可改，平台级账号只有超管能改，跨站必须切站。
 - 角色串不再从建号人复制，按站点写死（`0/平台超管` 或 `1/站点管理员`）。早期版本复制角色串会把 `admin` 串带到新账号，导致站点管理员被误判成超管（已修）。
 
-## 6.5 图片目录规范：站点 / 年 / 月 / 日
+## 6.5 桶内目录规范：站点 / 类型 / 年 / 月 / 日
 
-- 规范：`upload/<站点Code>/<YYYY>/<MM>/<DD>/<文件名>`，内页头图同规则但根为 `cn-banner/`。文件名在新上传时是 `<毫秒时间戳>-<随机6位><扩展名>`；历史图沿用原名（老 PHP 的 `YYYYMMDD...` 命名天然带日期）。
-- 日期口径：文件名以 `YYYYMMDD` 开头就用文件名里的日期；否则用 R2 对象的 `uploaded` 时间转 +08:00。前台读取始终是 `/assets/<key>`，按 key 精确命中，不做任何"猜路径"的回退。
-- 新上传（`src/worker/routes/admin-upload.ts`）：`todayPath()` 取北京时间给出 `y/m/d`，key = `upload/<code>/<y>/<m>/<d>/<时间戳-随机><ext>`；`isDeletable()` 只允许删本站前缀（bjrobust 额外兜底老的 `upload/<文件名>` 单层 key）。
+- 桶根第一层就是站点 Code，一眼能分清是哪家：`bjrobust/`、`aaaa/`、`bbbb/`。站点目录下再按类型分 `upload/`（普通图片）与 `cn-banner/`（内页头图），再按 `年/月/日` 分层。
+- 完整 key：
+  - 普通图：`<站点Code>/upload/<YYYY>/<MM>/<DD>/<文件名>`
+  - 内页头图：`<站点Code>/cn-banner/<YYYY>/<MM>/<DD>/<page>.<ext>`
+- 文件名：新上传是 `<毫秒时间戳>-<随机6位><扩展名>`；历史图沿用原名（老 PHP 的 `YYYYMMDD...` 命名天然带日期）。
+- 日期口径：文件名以 `YYYYMMDD` 开头就用文件名里的日期；否则用 R2 对象的 `uploaded` 时间转 +08:00。时间统一按北京时间。
+- 读取：库里只存 key，前台一律 `/assets/<key>` 精确命中；`assetsApp` 另有三层兼容回退（上一版 `upload/<code>/…`、`cn-banner/<code>/…`、老站 `upload/<文件名>`），历史错误链接也能打开。
+- 新上传（`src/worker/routes/admin-upload.ts`）：`todayPath()` 取北京时间给出 `y/m/d`，key = `<code>/upload/<y>/<m>/<d>/<时间戳-随机><ext>`；内页头图（`src/worker/lib/banner.ts`）key = `<code>/cn-banner/<y>/<m>/<d>/<page><ext>`。
+- 删除权限（`isDeletable`）：只允许删本 `<code>/` 目录下的对象；bjrobust 额外兜底上一版 `upload/bjrobust/`、`cn-banner/bjrobust/` 与老站单层 `upload/<文件名>`。
 - 历史搬迁接口：`POST /api/maint/storage/migrate`（独立前缀，只认 header `X-Maint-Token`，与 `env.MAINT_TOKEN` 比对，无 token 一律 403）。
   - 参数：`{dry, purge, limit, after, dbOnly, prefix, match}`
     - `dry:true` 只出计划（`legacyCount` / `queuedAfter` / `samples`；带 `match` 时返回 `matched` 明细，用于按文件名反查新旧 key）
     - `after` 是按 `oldKey` 排序的游标，用来分批（一次 `limit` 条，返回的 `remaining` 降到 0 即搬完）
     - `purge:true` 复制完顺带删旧 key；`dbOnly:true` 只改库不动 R2
-  - 流程：列举 R2 → 跳过首段已是站点 Code 的 key → 按规则生成新 key（重名加 `-2`）→ head 命中则跳过 → get/put 复制（写 `movedFrom` 元数据）→ 批量改库（`Content` 用 `REPLACE` + `instr(...)>0`，列值做裸名与旧 key双重替换）→ 可选 purge。
-- 线上现状（2026-11-23）：bjrobust 553 个历史对象已全部复制到 `upload/bjrobust/<Y>/<M>/<D>/` 与 `cn-banner/bjrobust/2026/11/13/`，库内引用已改写。全库 215 个唯一图片引用线上 HEAD 校验 213 个 200；剩余 2 个是 `t_img` 的历史死链（`4e934105…jpg`、`7ee9eb9f…jpg`），R2 与本地源目录都没有实体文件，迁移前就是 404。
+  - 映射规则：`upload/<code>/<年>/<月>/<日>/<文件>` 与 `cn-banner/<code>/…` → `<code>/upload/…`、`<code>/cn-banner/…`；桶根老图 `upload/<文件>`、`upload/<子目录>/<文件>` → `bjrobust/upload/<日期>/<文件>`；桶根裸文件名 → `bjrobust/upload/<日期>/<文件>`；桶根其他目录（如 `cn-images/logo-di.jpg`）→ `bjrobust/<原路径>`（`t_sites.LogoUrl` 一并改写成 `/assets/bjrobust/cn-images/logo-di.jpg`）。
+  - 盘点：body 带 `{"inventory":true}` 返回桶内按第一层目录的对象计数与站点目录之外的散落 key（`inventory` / `total` / `others`），用来确认桶根只剩站点目录。
+  - 流程：列举 R2（`upload/`、`cn-banner/` 两个根）→ 按上表生成新 key（重名加 `-2`）→ head 命中则跳过 → get/put 复制（写 `movedFrom` 元数据）→ 批量改库（`Content` 用 `REPLACE` + `instr(...)>0`，列值做裸名、旧 key、`/`+旧 key、`/assets/`+旧 key 四种匹配）→ 可选 purge。
+- 线上现状（2026-11-23）：桶内只剩 `bjrobust/` 一个站点目录（554 个对象：553 张图片 + 1 个 logo），`bjrobust/upload/<Y>/<M>/<D>/`、`bjrobust/cn-banner/2026/11/13/`、`bjrobust/cn-images/logo-di.jpg`；桶根已无散落文件。库内 217 行引用、213 个唯一 key 线上 HEAD 校验 **213/213 = 200**，0 条坏链。`t_img` 两条在 R2 与本地源目录都不存在的历史死链已清空字段。
 - 迁移令牌用完即弃：`npx wrangler secret delete MAINT_TOKEN` + 删本地 `.maint_token`；接口路由本身可以长期保留，靠 token 控制。
 
 ## 7. 已知限制（后续可做）
 
 - 前端产物是全站共用的一份（主题色/品牌走数据库，文案走 `t_content`）。如果以后某家要完全不同的版式，需要按站点追加独立页面组件。
-- `public/` 里打进产物的静态图（如 `cn-images/logo-di.jpg`）是三站共享的同一份文件；站点专属图片请走后台上传到 R2（会自动落到 `upload/<code>/`）。
+- `public/` 里打进产物的静态图（如 `cn-images/logo-di.jpg`）是三站共享的同一份文件；站点专属图片请走后台上传到 R2（会自动落到 `<code>/upload/<年>/<月>/<日>/`）。
 - `wrangler.json` 的 `assets.run_worker_first` 只把 `/` 和 `/index.html` 交给 Worker（为的是补 CSP/HSTS 与 no-cache），其余 js/css/图片由边缘直出、不经过 Worker；因此这些静态文件响应上没有自定义安全头，属预期行为。
 - 站点级管理员目前不限制菜单，只限制数据范围；要更细的权限，可在 `AdminLayout` 里按 `isSuper` 隐藏菜单并在后端逐个校验。
 - 没有站点级独立域名证书管理逻辑，证书由 Cloudflare Custom Domain 自动签发。

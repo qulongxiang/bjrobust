@@ -60,7 +60,7 @@ export default function UploadAdmin() {
 
 	const copyPath = async (key: string) => {
 		try {
-			await navigator.clipboard.writeText(key.replace(/^upload\//, "/upload/"));
+			await navigator.clipboard.writeText(`/assets/${key.replace(/^\//, "")}`);
 			flash(true, "路径已复制");
 		} catch {
 			flash(false, "复制失败，请手动复制");
@@ -84,7 +84,7 @@ export default function UploadAdmin() {
 					for (const f of Array.from(e.dataTransfer.files)) void upload(f);
 				}}
 			>
-				{uploading ? "上传中…" : "点击选择或拖拽图片到此处上传（存入 R2，路径前缀 upload/）"}
+				{uploading ? "上传中…" : "点击选择或拖拽图片到此处上传（存入 R2 的 <站点>/upload/年/月/日/）"}
 			</div>
 			<input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
 

@@ -1,6 +1,6 @@
 // 后台：图片上传到 R2
-// 分站存储：新图走 upload/<站点Code>/<年>/<月>/<日>/<文件名>，内页头图走 cn-banner/<站点Code>/
-// bjrobust 的历史图片已迁到 upload/bjrobust/<年>/<月>/<日>/，读取由 /assets 精确命中
+// 桶根直接是站点目录：<站点Code>/upload/<年>/<月>/<日>/<文件名>，内页头图 <站点Code>/cn-banner/<年>/<月>/<日>/
+// bjrobust 的历史图片已迁到 bjrobust/upload/<年>/<月>/<日>/，读取由 /assets 精确命中
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { isBannerPage, readBannerEntries, saveBannerFile, setBannerPic } from "../lib/banner";
@@ -17,15 +17,17 @@ function todayPath(): { y: string; m: string; d: string } {
 	return { y: String(bj.getUTCFullYear()), m: pad(bj.getUTCMonth() + 1), d: pad(bj.getUTCDate()) };
 }
 
+/** 站点私有前缀：<code>/upload/ */
 function uploadPrefix(siteCode: string): string {
-	return `upload/${siteCode}/`;
+	return `${siteCode}/upload/`;
 }
 
 /** 站点私有 key / 老站兼容 key 的判定 */
 function isDeletable(path: string, siteCode: string): boolean {
 	const key = path.replace(/^\//, "");
-	if (key.startsWith(uploadPrefix(siteCode))) return true;
-	// bjrobust 兼容：老图在 upload/<文件名>（只有一层）
+	if (key.startsWith(`${siteCode}/`)) return true; // 本站目录（upload / cn-banner 都算）
+	// bjrobust 兼容：上一版布局 upload/<code>/… 与老站的 upload/<文件名>
+	if (siteCode === "bjrobust" && (key.startsWith("upload/bjrobust/") || key.startsWith("cn-banner/bjrobust/"))) return true;
 	if (siteCode === "bjrobust" && key.startsWith("upload/") && !key.slice("upload/".length).includes("/")) return true;
 	return false;
 }
@@ -67,15 +69,6 @@ app.get("/upload/list", async (c) => {
 		updated: String(o.uploaded ?? ""),
 		url: `/assets/${o.key}`,
 	}));
-	// bjrobust 的历史图片（upload/<文件名>）一并列出，方便老站继续管理
-	if (site.code === "bjrobust") {
-		const legacy = await bucket.list({ prefix: "upload/", limit: 200 });
-		for (const o of legacy.objects) {
-			const rest = o.key.slice("upload/".length);
-			if (rest.includes("/")) continue; // 其他站点的目录
-			items.push({ key: o.key, size: o.size, updated: String(o.uploaded ?? ""), url: `/assets/${o.key}` });
-		}
-	}
 	items.sort((a, b) => (a.updated < b.updated ? 1 : -1));
 	return c.json({ ok: true, items });
 });

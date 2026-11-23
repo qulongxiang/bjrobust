@@ -1,5 +1,5 @@
 // 图片字段：上传到 R2 后把返回的键写进表单，不再手填路径
-// value 存的是裸键（如 upload/bjrobust/xxx.jpg），渲染时由 imgUrl 拼成 /assets/
+// value 存的是裸键（如 bjrobust/upload/2026/11/23/xxx.jpg），渲染时由 imgUrl 拼成 /assets/
 import { useState } from "react";
 import { assetUrl } from "../../api";
 import { adminApi } from "../api";
@@ -72,7 +72,7 @@ export default function ImageField({
 					<input
 						value={value}
 						onChange={(e) => onChange(e.target.value)}
-						placeholder="upload/xxx.jpg 或 https://..."
+						placeholder="bjrobust/upload/2026/11/23/xxx.jpg 或 https://..."
 						style={{ marginTop: 8 }}
 					/>
 				) : (

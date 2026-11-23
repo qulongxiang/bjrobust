@@ -82,7 +82,7 @@ function bjDate(): [string, string, string] {
 	return [String(bj.getUTCFullYear()), pad(bj.getUTCMonth() + 1), pad(bj.getUTCDate())];
 }
 
-/** 上传并替换某站点某页头图：落到 cn-banner/<code>/<年>/<月>/<日>/<page>.<ext>，再写库 */
+/** 上传并替换某站点某页头图：落到 <code>/cn-banner/<年>/<月>/<日>/<page>.<ext>，再写库 */
 export async function saveBannerFile(
 	env: AppEnv,
 	site: SiteInfo,
@@ -99,7 +99,7 @@ export async function saveBannerFile(
 	if (!sniffed) return { ok: false, error: "文件内容不是有效图片", status: 400 };
 
 	const [y, m, d] = bjDate();
-	const key = `cn-banner/${site.code}/${y}/${m}/${d}/${page}${ext}`;
+	const key = `${site.code}/cn-banner/${y}/${m}/${d}/${page}${ext}`;
 	await env.IMAGES.put(key, file.stream(), { httpMetadata: { contentType: sniffed } });
 	await setBannerPic(env, site.id, page, key);
 	return { ok: true, pic: key };

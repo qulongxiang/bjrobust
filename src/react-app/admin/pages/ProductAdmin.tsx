@@ -425,7 +425,7 @@ function ImageModal({
 				<div className="admin-row" style={{ marginTop: 16 }}>
 					<div className="admin-field">
 						<label>图片路径（/assets 或 /upload 前缀均可）</label>
-						<input value={pic} onChange={(e) => setPic(e.target.value)} placeholder="/upload/xxx.jpg" />
+						<input value={pic} onChange={(e) => setPic(e.target.value)} placeholder="bjrobust/upload/2026/11/23/xxx.jpg" />
 					</div>
 					<div className="admin-field">
 						<label>名称</label>

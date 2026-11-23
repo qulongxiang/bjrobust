@@ -489,10 +489,9 @@ app.post("/feedback", async (c) => {
 export default app;
 
 // ---- R2 图片：/assets/<key> ----
-// 分站规则：
-//   bjrobust 的历史图片保持 upload/<文件名>、cn-banner/<文件名>（原站目录）
-//   新上传走 upload/<站点 Code>/<文件名>、cn-banner/<站点 Code>/<文件名>
-// 读取时先试精确 key，再按当前站点前缀回退，最后回退老站前缀（兼容存量数据）
+// 桶根直接是站点目录：<站点Code>/upload/<年>/<月>/<日>/<文件名>、<站点Code>/cn-banner/<年>/<月>/<日>/<文件名>
+// 兼容：上一版 upload/<code>/… 、cn-banner/<code>/…，以及老 PHP 站的 upload/<文件名>
+// 读取时先试精确 key，再按上面几种旧布局回退
 const MIME_BY_EXT: Record<string, string> = {
 	".jpg": "image/jpeg",
 	".jpeg": "image/jpeg",
@@ -523,9 +522,15 @@ assetsApp.get("/*", async (c) => {
 
 	const tries: string[] = [key];
 	if (code) {
-		if (key.startsWith("upload/")) tries.push("upload/" + code + "/" + key.slice("upload/".length));
-		else if (key.startsWith("cn-banner/")) tries.push("cn-banner/" + code + "/" + key.slice("cn-banner/".length));
-		else tries.push("upload/" + code + "/" + key);
+		if (key.startsWith("upload/")) {
+			tries.push("upload/" + code + "/" + key.slice("upload/".length)); // 上一版 upload/<code>/…
+			tries.push(code + "/upload/" + key.slice("upload/".length));
+		} else if (key.startsWith("cn-banner/")) {
+			tries.push("cn-banner/" + code + "/" + key.slice("cn-banner/".length));
+			tries.push(code + "/cn-banner/" + key.slice("cn-banner/".length));
+		} else if (!key.startsWith(code + "/")) {
+			tries.push(code + "/upload/" + key); // 库内裸文件名
+		}
 	}
 	// 兼容库内裸文件名（无 upload/ 前缀）的历史图片
 	if (!key.startsWith("upload/") && !key.startsWith("cn-banner/")) tries.push("upload/" + key);

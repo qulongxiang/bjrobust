@@ -1,8 +1,9 @@
 // 运维工具：历史图片整理
-// 目标：把 R2 根目录下的历史图片（upload/<文件名>、upload/<子目录>/…、cn-banner/<文件名>）
-// 迁到「按站点 + 年/月/日」的目录，并把库里所有引用同步改写成新 key：
-//   upload/<站点Code>/<YYYY>/<MM>/<DD>/<文件名>
-//   cn-banner/<站点Code>/<YYYY>/<MM>/<DD>/<文件名>
+// 目标：R2 桶根目录直接是站点目录，站点目录下再分 upload / cn-banner，图片再按年/月/日分层：
+//   <站点Code>/upload/<YYYY>/<MM>/<DD>/<文件名>
+//   <站点Code>/cn-banner/<YYYY>/<MM>/<DD>/<文件名>
+// 历史（老 PHP 站）图片留在桶根：upload/<文件名>、upload/<子目录>/…
+// 上一版布局也一并搬走：upload/<站点Code>/<日期>/…、cn-banner/<站点Code>/<日期>/…
 // 说明：
 //   - 默认只复制不删除（purge=true 才删旧对象），可反复执行（幂等）
 //   - 历史文件都来自老 PHP 站（bjrobust），统一归到 bjrobust 目录
@@ -73,7 +74,41 @@ const TARGETS: [string, string][] = [
 	["t_sites", "LogoUrl"],
 ];
 
-/** 批量改写库内引用：把旧文件名/旧 key 换成新 key（幂等，可重复跑） */
+/**
+ * 单个旧 key → 新 key 的映射（新布局：<code>/upload/年/月/日/文件）
+ * 返回 null 表示已经在目标布局下，无需搬。
+ */
+function mapKey(key: string, size: number, uploaded: Date | string | undefined, codes: Set<string>): PlanItem | null {
+	const segs = key.split("/").filter(Boolean);
+	if (!segs.length) return null;
+	if (codes.has(segs[0].toLowerCase())) return null; // <code>/… 已经是目标布局
+
+	const root = segs[0] === "upload" || segs[0] === "cn-banner" ? segs[0] : "";
+	if (!root) {
+		// 桶根散落资源：cn-images/logo-di.jpg → bjrobust/cn-images/logo-di.jpg
+		if (segs.length > 1) return { oldKey: key, newKey: `bjrobust/${key}`, size, date: "" };
+		// 桶根裸文件名 → bjrobust/upload/<日期>/<文件>
+		const base = segs[0];
+		return { oldKey: key, newKey: `bjrobust/upload/${dateOf(uploaded, base)}/${base}`, size, date: dateOf(uploaded, base) };
+	}
+
+	const rest = key.slice(root.length + 1);
+	const parts = rest.split("/").filter(Boolean);
+	if (!parts.length) return null;
+
+	const seg0 = parts[0].toLowerCase();
+	// 上一版布局：upload/<站点Code>/<年>/<月>/<日>/<文件> → <站点Code>/upload/<年>/<月>/<日>/<文件>
+	if (codes.has(seg0) && parts.length >= 4) {
+		const tail = parts.slice(1).join("/");
+		return { oldKey: key, newKey: `${seg0}/${root}/${tail}`, size, date: parts.slice(1, 4).join("/") };
+	}
+	// 桶根历史文件：upload/<文件> 或 upload/<子目录>/<文件> → bjrobust/upload/<日期>/<文件>
+	const base = parts[parts.length - 1];
+	const date = dateOf(uploaded, base);
+	return { oldKey: key, newKey: `bjrobust/${root}/${date}/${base}`, size, date };
+}
+
+/** 批量改写库内引用：把旧 key / 裸文件名 / 富文本里的旧路径换成新 key（幂等，可重复跑） */
 async function applyDbRewrites(
 	env: AppEnv,
 	items: PlanItem[],
@@ -84,25 +119,26 @@ async function applyDbRewrites(
 	for (const [table] of TARGETS) if (!colsOf.has(table)) colsOf.set(table, await tableColumns(env, table));
 	const stmts: D1PreparedStatement[] = [];
 	for (const p of items) {
-		const oldRel = p.oldKey.split("/").pop() ?? p.oldKey; // 库里存的多是裸文件名
-		const oldSub = p.oldKey.replace(/^cn-banner\//, ""); // 富文本里可能带子目录（upload/image/x.jpg）
+		const base = p.oldKey.split("/").pop() ?? p.oldKey; // 库里存的多是裸文件名
 		for (const [table, col] of TARGETS) {
 			if (!colsOf.get(table)?.has(col)) continue;
 			if (col === "Content") {
-				const pairs: [string, string][] = [[`/upload/${oldRel}`, `/assets/${p.newKey}`]];
-				if (oldSub !== oldRel && p.oldKey.startsWith("upload/")) {
-					pairs.push([`/upload/${oldSub}`, `/assets/${p.newKey}`]);
-				}
-				for (const [from, to] of pairs) {
-					stmts.push(
-						db
-							.prepare(`UPDATE "${table}" SET "${col}" = REPLACE("${col}", ?, ?) WHERE instr("${col}", ?) > 0`)
-							.bind(from, to, from),
-					);
-				}
+				// 富文本：整条旧 key（含 /assets/ 前缀）直接替换；再兜底老站 /upload/<文件名>
+				stmts.push(
+					db
+						.prepare(`UPDATE "${table}" SET "${col}" = REPLACE("${col}", ?, ?) WHERE instr("${col}", ?) > 0`)
+						.bind(p.oldKey, p.newKey, p.oldKey),
+				);
+				stmts.push(
+					db
+						.prepare(`UPDATE "${table}" SET "${col}" = REPLACE("${col}", ?, ?) WHERE instr("${col}", ?) > 0`)
+						.bind(`/upload/${base}`, `/assets/${p.newKey}`, `/upload/${base}`),
+				);
 			} else {
-				stmts.push(db.prepare(`UPDATE "${table}" SET "${col}" = ? WHERE "${col}" = ?`).bind(p.newKey, oldRel));
-				stmts.push(db.prepare(`UPDATE "${table}" SET "${col}" = ? WHERE "${col}" = ?`).bind(p.newKey, p.oldKey));
+				for (const from of [base, p.oldKey, `/${p.oldKey}`, `/assets/${p.oldKey}`]) {
+					const to = from.startsWith("/assets/") ? `/assets/${p.newKey}` : p.newKey;
+					stmts.push(db.prepare(`UPDATE "${table}" SET "${col}" = ? WHERE "${col}" = ?`).bind(to, from));
+				}
 			}
 		}
 	}
@@ -152,15 +188,26 @@ export async function migrateHandler(c: Context<{ Bindings: AppEnv; Variables: A
 	const sites = (await db.prepare("SELECT id, Code FROM t_sites").all()).results as unknown as SiteRow[];
 	const codes = new Set(sites.map((s) => String(s.Code).toLowerCase()));
 
-	// 1) 找历史对象（不含 <站点Code>/ 目录下的）
-	const roots = only ? [`${only}/`] : ["upload/", "cn-banner/"];
+	// 0) 盘点：按第一层目录统计对象数，看看桶根有没有站点目录之外的散落资源
+	if (b.inventory === true) {
+		const all = await listPrefix(c.env.IMAGES, only);
+		const byTop: Record<string, number> = {};
+		const keys: string[] = [];
+		for (const o of all) {
+			const top = o.key.includes("/") ? o.key.split("/")[0] : "(root file)";
+			byTop[top] = (byTop[top] ?? 0) + 1;
+			if (!codes.has(top.toLowerCase())) keys.push(o.key);
+		}
+		return c.json({ ok: true, inventory: byTop, total: all.length, others: keys.slice(0, 100) });
+	}
+
+	// 1) 找历史对象（upload/ 与 cn-banner/ 根下的都属于历史；已在 <code>/ 下的跳过）
+	const roots = only ? [`${only}/`] : [""];
 	const legacy: { key: string; size: number; uploaded?: Date | string; root: string }[] = [];
 	for (const root of roots) {
 		for (const o of await listPrefix(c.env.IMAGES, root)) {
 			const rest = o.key.slice(root.length);
 			if (!rest) continue;
-			const seg = rest.split("/")[0].toLowerCase();
-			if (codes.has(seg)) continue;
 			legacy.push({ ...o, root });
 		}
 	}
@@ -170,20 +217,20 @@ export async function migrateHandler(c: Context<{ Bindings: AppEnv; Variables: A
 	const used = new Set<string>();
 	const plan: PlanItem[] = [];
 	for (const o of legacy) {
-		const base = o.key.split("/").pop() ?? "";
-		const siteCode = "bjrobust"; // 历史对象都来自老 PHP 站
-		const date = dateOf(o.uploaded, base);
-		let newKey = `${o.root}${siteCode}/${date}/${base}`;
+		const item = mapKey(o.key, o.size, o.uploaded, codes);
+		if (!item) continue;
+		let newKey = item.newKey;
 		let n = 2;
 		while (used.has(newKey)) {
+			const base = newKey.split("/").pop() ?? "";
 			const dot = base.lastIndexOf(".");
 			const stem = dot > 0 ? base.slice(0, dot) : base;
 			const ext = dot > 0 ? base.slice(dot) : "";
-			newKey = `${o.root}${siteCode}/${date}/${stem}-${n}${ext}`;
+			newKey = `${newKey.slice(0, newKey.length - base.length)}${stem}-${n}${ext}`;
 			n += 1;
 		}
 		used.add(newKey);
-		plan.push({ oldKey: o.key, newKey, size: o.size, date });
+		plan.push({ ...item, newKey });
 	}
 
 	if (dry) {
