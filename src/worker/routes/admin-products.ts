@@ -1,4 +1,4 @@
-// 后台：产品管理（t_products + t_img 图集 + t_protype 分类树）
+// 后台：产品管理（t_products + t_img 图集 + t_protype 分类树）—— 全部限定在当前站点
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
@@ -33,16 +33,17 @@ function pick(r: Record<string, unknown>) {
 
 app.get("/products", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const page = Math.max(parseInt(c.req.query("page") ?? "1", 10), 1);
 	const size = Math.min(Math.max(parseInt(c.req.query("pageSize") ?? "15", 10), 1), 100);
 	const typeId = c.req.query("typeId");
-	const where: string[] = [];
-	const params: (string | number)[] = [];
+	const where: string[] = ['"SiteId" = ?'];
+	const params: (string | number)[] = [siteId];
 	if (typeId) {
 		where.push("TypeID = ?");
 		params.push(Number(typeId));
 	}
-	const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+	const whereSql = "WHERE " + where.join(" AND ");
 	const total = await count(db.prepare(`SELECT COUNT(*) AS n FROM t_products ${whereSql}`).bind(...params));
 	const list = await rows(
 		db
@@ -54,6 +55,7 @@ app.get("/products", async (c) => {
 
 app.post("/products", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
 	const name = String(b.name ?? "").trim().slice(0, 200);
@@ -61,8 +63,9 @@ app.post("/products", async (c) => {
 	const now = nowSql();
 	const res = await exec(
 		db.prepare(
-			"INSERT INTO t_products (ProName, Content, Memo, NoteTime, SmallPic, IsShow, IsCommend, OrderBy, TypeID, Hits, Language, WebTitle, WebKey, WebDesc, BH, BZ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+			'INSERT INTO t_products ("SiteId", ProName, Content, Memo, NoteTime, SmallPic, IsShow, IsCommend, OrderBy, TypeID, Hits, Language, WebTitle, WebKey, WebDesc, BH, BZ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
 		),
+		siteId,
 		name,
 		String(b.content ?? ""),
 		String(b.memo ?? ""),
@@ -102,6 +105,7 @@ const UPDATABLE: Record<string, string> = {
 
 app.put("/products/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
@@ -115,25 +119,29 @@ app.put("/products/:id", async (c) => {
 		sets.push(`${col} = ?`);
 	}
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
-	const res = await db.prepare(`UPDATE t_products SET ${sets.join(", ")} WHERE id = ?`).bind(...params, id).run();
+	const res = await db.prepare(`UPDATE t_products SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
 app.delete("/products/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	await exec(db.prepare("DELETE FROM t_img WHERE ProID = ?"), id);
-	const res = await exec(db.prepare("DELETE FROM t_products WHERE id = ?"), id);
+	const owner = await db.prepare('SELECT id FROM t_products WHERE "SiteId" = ? AND id = ?').bind(siteId, id).first();
+	if (!owner) return c.json({ error: "记录不存在" }, 404);
+	await exec(db.prepare('DELETE FROM t_img WHERE "SiteId" = ? AND ProID = ?'), siteId, id);
+	const res = await exec(db.prepare('DELETE FROM t_products WHERE "SiteId" = ? AND id = ?'), siteId, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
 // ---- 产品图集（t_img） ----
 app.get("/products/:id/images", async (c) => {
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
 	const list = await rows(
-		c.env.DB.prepare("SELECT id, ProName, PicUrl, BigUrl, OrderBy, IsShow FROM t_img WHERE ProID = ? ORDER BY OrderBy, id").bind(id),
+		c.env.DB.prepare('SELECT id, ProName, PicUrl, BigUrl, OrderBy, IsShow FROM t_img WHERE "SiteId" = ? AND ProID = ? ORDER BY OrderBy, id').bind(siteId, id),
 	);
 	return c.json({
 		ok: true,
@@ -150,15 +158,17 @@ app.get("/products/:id/images", async (c) => {
 
 app.post("/products/:id/images", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	const exists = await db.prepare("SELECT id FROM t_products WHERE id = ?").bind(id).first();
+	const exists = await db.prepare('SELECT id FROM t_products WHERE "SiteId" = ? AND id = ?').bind(siteId, id).first();
 	if (!exists) return c.json({ error: "产品不存在" }, 404);
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
 	const pic = String(b.pic ?? "").trim();
 	if (!pic) return c.json({ error: "图片地址不能为空" }, 400);
 	const res = await exec(
-		db.prepare("INSERT INTO t_img (ProName, PicUrl, BigUrl, NoteTime, IsShow, IsCommend, OrderBy, ProID, Language) VALUES (?,?,?,?,?,?,?,?,?)"),
+		db.prepare('INSERT INTO t_img ("SiteId", ProName, PicUrl, BigUrl, NoteTime, IsShow, IsCommend, OrderBy, ProID, Language) VALUES (?,?,?,?,?,?,?,?,?,?)'),
+		siteId,
 		String(b.name ?? ""),
 		pic,
 		String(b.big ?? pic),
@@ -173,15 +183,16 @@ app.post("/products/:id/images", async (c) => {
 });
 
 app.delete("/images/:id", async (c) => {
-	const res = await exec(c.env.DB.prepare("DELETE FROM t_img WHERE id = ?"), Number(c.req.param("id")));
+	const res = await exec(c.env.DB.prepare('DELETE FROM t_img WHERE "SiteId" = ? AND id = ?'), c.get("siteId"), Number(c.req.param("id")));
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
 // ---- 产品分类（t_protype，两级树） ----
 app.get("/product-types", async (c) => {
+	const siteId = c.get("siteId");
 	const list = await rows(
-		c.env.DB.prepare("SELECT id, Called, PicUrl, OrderBy, IsShow, Memo, PID, TypeLevel, ParentPath FROM t_protype ORDER BY OrderBy, id"),
+		c.env.DB.prepare('SELECT id, Called, PicUrl, OrderBy, IsShow, Memo, PID, TypeLevel, ParentPath FROM t_protype WHERE "SiteId" = ? ORDER BY OrderBy, id').bind(siteId),
 	);
 	const items = list.map((r) => ({
 		id: Number(r.id),
@@ -202,17 +213,19 @@ app.get("/product-types", async (c) => {
 
 app.post("/product-types", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const b = await c.req.json().catch(() => null);
 	const name = String(b?.name ?? "").trim().slice(0, 100);
 	if (!name) return c.json({ error: "分类名不能为空" }, 400);
 	const pid = Number(b.pid ?? 0);
 	const level = pid ? 1 : 0;
 	if (pid) {
-		const parent = await db.prepare("SELECT id FROM t_protype WHERE id = ?").bind(pid).first();
+		const parent = await db.prepare('SELECT id FROM t_protype WHERE "SiteId" = ? AND id = ?').bind(siteId, pid).first();
 		if (!parent) return c.json({ error: "父分类不存在" }, 400);
 	}
 	const res = await exec(
-		db.prepare("INSERT INTO t_protype (Called, PicUrl, OrderBy, IsShow, Memo, PID, TypeLevel, Language, ParentPath, NoteTime) VALUES (?,?,?,?,?,?,?,?,?,?)"),
+		db.prepare('INSERT INTO t_protype ("SiteId", Called, PicUrl, OrderBy, IsShow, Memo, PID, TypeLevel, Language, ParentPath, NoteTime) VALUES (?,?,?,?,?,?,?,?,?,?,?)'),
+		siteId,
 		name,
 		String(b.pic ?? ""),
 		Number(b.order ?? 0),
@@ -238,6 +251,7 @@ const TYPE_UPDATABLE: Record<string, string> = {
 
 app.put("/product-types/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
@@ -251,19 +265,20 @@ app.put("/product-types/:id", async (c) => {
 		sets.push(`${col} = ?`);
 	}
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
-	const res = await db.prepare(`UPDATE t_protype SET ${sets.join(", ")} WHERE id = ?`).bind(...params, id).run();
+	const res = await db.prepare(`UPDATE t_protype SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
 app.delete("/product-types/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	const hasChildren = await count(db.prepare("SELECT COUNT(*) AS n FROM t_protype WHERE PID = ?").bind(id));
+	const hasChildren = await count(db.prepare('SELECT COUNT(*) AS n FROM t_protype WHERE "SiteId" = ? AND PID = ?').bind(siteId, id));
 	if (hasChildren > 0) return c.json({ error: "该分类下有子分类，不能删除" }, 400);
-	const used = await count(db.prepare("SELECT COUNT(*) AS n FROM t_products WHERE TypeID = ?").bind(id));
+	const used = await count(db.prepare('SELECT COUNT(*) AS n FROM t_products WHERE "SiteId" = ? AND TypeID = ?').bind(siteId, id));
 	if (used > 0) return c.json({ error: "该分类下仍有产品，不能删除" }, 400);
-	const res = await exec(db.prepare("DELETE FROM t_protype WHERE id = ?"), id);
+	const res = await exec(db.prepare('DELETE FROM t_protype WHERE "SiteId" = ? AND id = ?'), siteId, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });

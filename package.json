@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"bcryptjs": "^3.0.3",
+		"dompurify": "^3.5.0",
 		"hono": "4.11.1",
 		"react": "19.2.1",
 		"react-dom": "19.2.1",

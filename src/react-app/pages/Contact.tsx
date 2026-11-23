@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import PageHero from "../components/PageHero";
+import { safeHtml } from "../lib/html";
 
 // 地图片段是旧站整页 HTML（含 <script>），dangerouslySetInnerHTML 不会执行脚本，
 // 所以这里解析出 AMap key 与坐标后动态加载高德 JS API 初始化地图；加载失败显示跳转链接兜底
@@ -111,7 +112,7 @@ export default function Contact() {
 
 			<section className="section">
 				<div className="container">
-					{info ? <div className="rich static-page" dangerouslySetInnerHTML={{ __html: info }} /> : null}
+					{info ? <div className="rich static-page" dangerouslySetInnerHTML={{ __html: safeHtml(info) }} /> : null}
 					{map ? <div style={{ marginTop: 24 }}><AMapBox html={map} /></div> : null}
 
 					<div className="form-card" style={{ marginTop: 36 }}>

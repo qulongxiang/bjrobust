@@ -14,6 +14,7 @@ import FeedbackAdmin from "./admin/pages/FeedbackAdmin";
 import SiteAdmin from "./admin/pages/SiteAdmin";
 import UploadAdmin from "./admin/pages/UploadAdmin";
 import UserAdmin from "./admin/pages/UserAdmin";
+import PlatformAdmin from "./admin/pages/PlatformAdmin";
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -46,6 +47,8 @@ export default function App() {
 					<Route path="site" element={<SiteAdmin />} />
 					<Route path="upload" element={<UploadAdmin />} />
 					<Route path="users" element={<UserAdmin />} />
+					{/* 平台管理（超管）：多站点建站/域名绑定/启停；站点管理员进入会被后端 403 */}
+					<Route path="platform" element={<PlatformAdmin />} />
 					<Route path="*" element={<Navigate to="/admin/news" replace />} />
 				</Route>
 				{/* 前台页面 */}

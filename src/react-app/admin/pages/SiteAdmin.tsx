@@ -1,11 +1,12 @@
 // 站点设置（t_global）+ 静态页（t_content）编辑 + 内页头图管理（R2 cn-banner/）
 import { useEffect, useState } from "react";
-import { adminApi, type ContentPage, type GlobalSettings } from "../api";
+import { adminApi, type ContentPage, type GlobalSettings, type SiteMetaInfo } from "../api";
 
 type BannerItem = { name: string; page: string; url: string; size: number; updated: string | null };
 
 export default function SiteAdmin() {
 	const [global, setGlobal] = useState<GlobalSettings>(null);
+	const [meta, setMeta] = useState<SiteMetaInfo | null>(null);
 	const [pages, setPages] = useState<ContentPage[]>([]);
 	const [editing, setEditing] = useState<ContentPage | null>(null);
 	const [banners, setBanners] = useState<BannerItem[]>([]);
@@ -30,6 +31,10 @@ export default function SiteAdmin() {
 			.then((d) => setPages(d.items))
 			.catch(() => {});
 		loadBanners();
+		adminApi
+			.siteMeta()
+			.then((d) => setMeta(d.meta))
+			.catch(() => {});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -62,6 +67,25 @@ export default function SiteAdmin() {
 		}
 	};
 
+	const saveMeta = async () => {
+		if (!meta) return;
+		setBusy(true);
+		try {
+			await adminApi.saveSiteMeta({
+				companyName: meta.companyName,
+				hotline: meta.hotline,
+				email: meta.email,
+				logoUrl: meta.logoUrl,
+				theme: meta.theme,
+			});
+			flash(true, "品牌与主题已保存");
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "保存失败");
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	const onBannerFile = async (name: string, file: File | null) => {
 		if (!file) return;
 		setBannerBusy(name);
@@ -85,6 +109,85 @@ export default function SiteAdmin() {
 			</div>
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
+
+			{meta ? (
+				<div className="admin-panel">
+					<h3 style={{ marginTop: 0 }}>品牌与主题（站点 {meta.code}）</h3>
+					<p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+						这里决定前台顶栏的公司名 / 热线 / 邮箱 / Logo 与主色调；保存后前台强刷（Ctrl+F5）生效。
+					</p>
+					<div className="admin-row">
+						<div className="admin-field">
+							<label>公司全称（前台欢迎语、页脚版权）</label>
+							<input
+								value={meta.companyName}
+								onChange={(e) => setMeta({ ...meta, companyName: e.target.value })}
+							/>
+						</div>
+						<div className="admin-field">
+							<label>服务热线</label>
+							<input value={meta.hotline} onChange={(e) => setMeta({ ...meta, hotline: e.target.value })} />
+						</div>
+					</div>
+					<div className="admin-row">
+						<div className="admin-field">
+							<label>服务邮箱</label>
+							<input value={meta.email} onChange={(e) => setMeta({ ...meta, email: e.target.value })} />
+						</div>
+						<div className="admin-field">
+							<label>Logo 地址（/assets/... 或 https://）</label>
+							<input value={meta.logoUrl} onChange={(e) => setMeta({ ...meta, logoUrl: e.target.value })} />
+						</div>
+					</div>
+					<div className="admin-row">
+						<div className="admin-field">
+							<label>主色</label>
+							<div className="color-input">
+								<input
+									type="color"
+									value={meta.theme.primary ?? "#14508c"}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, primary: e.target.value } })}
+								/>
+								<input
+									value={meta.theme.primary ?? ""}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, primary: e.target.value } })}
+								/>
+							</div>
+						</div>
+						<div className="admin-field">
+							<label>主色（深）</label>
+							<div className="color-input">
+								<input
+									type="color"
+									value={meta.theme.primaryDark ?? "#0e3c6e"}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, primaryDark: e.target.value } })}
+								/>
+								<input
+									value={meta.theme.primaryDark ?? ""}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, primaryDark: e.target.value } })}
+								/>
+							</div>
+						</div>
+						<div className="admin-field">
+							<label>强调色</label>
+							<div className="color-input">
+								<input
+									type="color"
+									value={meta.theme.accent ?? "#ff9f00"}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, accent: e.target.value } })}
+								/>
+								<input
+									value={meta.theme.accent ?? ""}
+									onChange={(e) => setMeta({ ...meta, theme: { ...meta.theme, accent: e.target.value } })}
+								/>
+							</div>
+						</div>
+					</div>
+					<button className="btn primary" disabled={busy} onClick={saveMeta}>
+						{busy ? "保存中…" : "保存品牌与主题"}
+					</button>
+				</div>
+			) : null}
 
 			<div className="admin-panel">
 				<h3 style={{ marginTop: 0 }}>全局信息（t_global）</h3>

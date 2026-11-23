@@ -12,6 +12,61 @@ export type AdminUser = {
 	UserName: string;
 	UserRole: string;
 	UserRoleCalled: string;
+	/** 0 = 平台超管；>0 = 站点管理员 */
+	siteId: number;
+	/** 超管可跨站切换（/me 返回） */
+	isSuper?: boolean;
+};
+
+export type SiteSummary = { code: string; name: string };
+
+/** 后台当前操作的站点：超管切站点时写这里，其他请求都会带上 X-Site-Code */
+const SITE_KEY = "admin_active_site";
+
+export function getActiveSiteCode(): string {
+	try {
+		return localStorage.getItem(SITE_KEY) ?? "";
+	} catch {
+		return "";
+	}
+}
+
+export function setActiveSiteCode(code: string): void {
+	try {
+		if (code) localStorage.setItem(SITE_KEY, code);
+		else localStorage.removeItem(SITE_KEY);
+	} catch {
+		/* 忽略 */
+	}
+}
+
+export type PlatformSite = {
+	id: number;
+	code: string;
+	name: string;
+	companyName: string;
+	hotline: string;
+	email: string;
+	logoUrl: string;
+	theme: SiteTheme;
+	isActive: number;
+	sort: number;
+	domains: string[];
+};
+
+export type PlatformStats = { news: number; products: number; feedback: number; initialized: boolean };
+
+export type SiteTheme = { primary?: string; primaryDark?: string; accent?: string };
+
+export type SiteMetaInfo = {
+	id: number;
+	code: string;
+	name: string;
+	companyName: string;
+	hotline: string;
+	email: string;
+	logoUrl: string;
+	theme: SiteTheme;
 };
 
 export type AdminNews = {
@@ -99,7 +154,13 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(url, {
 		credentials: "same-origin",
 		...init,
-		headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+		headers: {
+			"Content-Type": "application/json",
+			// 后台写操作要求自定义头（服务端 csrfGuard 校验），顺带带上超管切换的站点
+			"X-CSRF": "1",
+			...(getActiveSiteCode() ? { "X-Site-Code": getActiveSiteCode() } : {}),
+			...(init?.headers ?? {}),
+		},
 	});
 	if (res.status === 401 && !url.includes("/api/admin/login") && !location.pathname.startsWith("/admin/login")) {
 		location.href = "/admin/login";
@@ -113,7 +174,10 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
 const j = (body: unknown) => JSON.stringify(body);
 
 export const adminApi = {
-	me: () => req<{ ok: boolean; user: AdminUser }>("/api/admin/me"),
+	me: () =>
+		req<{ ok: boolean; user: AdminUser; site: { code: string; name: string; companyName: string; theme: SiteTheme }; sites: SiteSummary[] }>(
+			"/api/admin/me",
+		),
 	login: (username: string, password: string) =>
 		req<{ ok: boolean; user: AdminUser }>("/api/admin/login", { method: "POST", body: j({ username, password }) }),
 	logout: () => req<{ ok: boolean }>("/api/admin/logout", { method: "POST" }),
@@ -193,7 +257,15 @@ export const adminApi = {
 	replaceBanner: (name: string, file: File): Promise<{ ok: boolean }> => {
 		const form = new FormData();
 		form.append("file", file);
-		return fetch(`/api/admin/banners/${name}`, { method: "PUT", credentials: "same-origin", body: form }).then(async (r) => {
+		return fetch(`/api/admin/banners/${name}`, {
+			method: "PUT",
+			credentials: "same-origin",
+			headers: {
+				"X-CSRF": "1",
+				...(getActiveSiteCode() ? { "X-Site-Code": getActiveSiteCode() } : {}),
+			},
+			body: form,
+		}).then(async (r) => {
 			const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 			if (!r.ok) throw new ApiError(r.status, d.error ?? `HTTP ${r.status}`);
 			return d as { ok: true };
@@ -203,7 +275,15 @@ export const adminApi = {
 	uploadFiles: (file: File): Promise<{ ok: boolean; path: string; url: string }> => {
 		const form = new FormData();
 		form.append("file", file);
-		return fetch("/api/admin/upload", { method: "POST", credentials: "same-origin", body: form }).then(async (r) => {
+		return fetch("/api/admin/upload", {
+			method: "POST",
+			credentials: "same-origin",
+			headers: {
+				"X-CSRF": "1",
+				...(getActiveSiteCode() ? { "X-Site-Code": getActiveSiteCode() } : {}),
+			},
+			body: form,
+		}).then(async (r) => {
 			const d = (await r.json().catch(() => ({}))) as { ok?: boolean; path?: string; url?: string; error?: string };
 			if (!r.ok) throw new ApiError(r.status, d.error ?? `HTTP ${r.status}`);
 			return d as { ok: true; path: string; url: string };
@@ -212,4 +292,39 @@ export const adminApi = {
 	uploadList: () => req<{ ok: boolean; items: UploadFile[] }>("/api/admin/upload/list"),
 	delUpload: (path: string) =>
 		req<{ ok: boolean }>(`/api/admin/upload?path=${encodeURIComponent(path)}`, { method: "DELETE" }),
+
+	// ---- 站点品牌与主题（当前生效站点） ----
+	siteMeta: () => req<{ ok: boolean; meta: SiteMetaInfo }>("/api/admin/site-meta"),
+	saveSiteMeta: (b: Partial<SiteMetaInfo>) =>
+		req<{ ok: boolean }>("/api/admin/site-meta", { method: "PUT", body: j(b) }),
+
+	// ---- 平台管理（仅超管） ----
+	platformSites: () =>
+		req<{ ok: boolean; sites: PlatformSite[]; stats: Record<string, PlatformStats>; defaultCode: string; currentCode: string }>(
+			"/api/admin/platform/sites",
+		),
+	createPlatformSite: (b: {
+		code: string;
+		name: string;
+		companyName?: string;
+		hotline?: string;
+		email?: string;
+		logoUrl?: string;
+		theme?: SiteTheme;
+		hosts?: string[];
+		sort?: number;
+		init?: boolean;
+	}) => req<{ ok: boolean; id: number; code: string }>("/api/admin/platform/sites", { method: "POST", body: j(b) }),
+	updatePlatformSite: (
+		id: number,
+		b: Partial<Pick<PlatformSite, "name" | "companyName" | "hotline" | "email" | "logoUrl" | "isActive" | "sort">> & {
+			theme?: SiteTheme;
+		},
+	) => req<{ ok: boolean }>(`/api/admin/platform/sites/${id}`, { method: "PUT", body: j(b) }),
+	savePlatformDomains: (id: number, hosts: string[]) =>
+		req<{ ok: boolean; hosts: string[] }>(`/api/admin/platform/sites/${id}/domains`, { method: "PUT", body: j({ hosts }) }),
+	scaffoldPlatformSite: (id: number) =>
+		req<{ ok: boolean; created: boolean; message: string }>(`/api/admin/platform/sites/${id}/scaffold`, { method: "POST" }),
+	deletePlatformSite: (id: number, force = false) =>
+		req<{ ok: boolean }>(`/api/admin/platform/sites/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
 };

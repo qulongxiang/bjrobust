@@ -4,6 +4,8 @@
 	--primary-dark: #0e3c6e;
 	--primary-light: #eaf1f9;
 	--accent: #2f81f7;
+	/* 强调色（旧站橙色）：由站点主题覆盖 —— Layout 会把 t_sites.Theme.accent 写进 --accent-strong */
+	--accent-strong: #ff9f00;
 	--text: #2b2f36;
 	--text-light: #6b7280;
 	--bg-soft: #f5f7fa;
@@ -156,7 +158,7 @@
 }
 
 .top-bar-hotline b {
-	color: #ff9f00;
+	color: var(--accent-strong, #ff9f00);
 	font-size: 15px;
 	font-weight: 700;
 }
@@ -485,7 +487,7 @@
 	font-size: 20px;
 	font-weight: 700;
 	color: #1f2937;
-	border-left: 4px solid #ff9f00;
+	border-left: 4px solid var(--accent-strong, #ff9f00);
 	padding-left: 10px;
 	line-height: 1.2;
 }
@@ -554,7 +556,7 @@
 
 .side-title .mores {
 	font-size: 13px;
-	color: #ff9f00;
+	color: var(--accent-strong, #ff9f00);
 	letter-spacing: 1px;
 }
 
@@ -690,7 +692,7 @@
 	width: 5px;
 	height: 5px;
 	border-radius: 50%;
-	background: #ff9f00;
+	background: var(--accent-strong, #ff9f00);
 }
 
 .news-brief a {
@@ -948,7 +950,7 @@
 	overflow: hidden;
 	background: linear-gradient(135deg, var(--primary-dark), var(--primary));
 	min-height: 60px;
-	border-bottom: 5px solid #ff9f00;
+	border-bottom: 5px solid var(--accent-strong, #ff9f00);
 }
 
 .page-hero img {

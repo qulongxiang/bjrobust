@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, imgUrl, type HomeData } from "../api";
+import { safeHtml } from "../lib/html";
 
 export default function Home() {
 	const [d, setD] = useState<HomeData | null>(null);
@@ -112,7 +113,7 @@ export default function Home() {
 								<span>公司概况</span>
 								<Link className="mores" to="/about">MORE+</Link>
 							</div>
-							<div className="about-brief" dangerouslySetInnerHTML={{ __html: d.about }} />
+							<div className="about-brief" dangerouslySetInnerHTML={{ __html: safeHtml(d.about) }} />
 						</section>
 					) : null}
 

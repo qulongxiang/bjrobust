@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, imgUrl, type NewsItem } from "../api";
 import PageHero from "../components/PageHero";
+import { safeHtml } from "../lib/html";
 
 export default function About() {
 	const [content, setContent] = useState("");
@@ -38,7 +39,7 @@ export default function About() {
 					{failed ? (
 						<div className="empty">页面不存在</div>
 					) : content ? (
-						<div className="rich static-page" dangerouslySetInnerHTML={{ __html: content }} />
+						<div className="rich static-page" dangerouslySetInnerHTML={{ __html: safeHtml(content) }} />
 					) : (
 						<div className="empty">加载中…</div>
 					)}

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, imgUrl, type ProductDetailData } from "../api";
 import PageHero from "../components/PageHero";
+import { safeHtml } from "../lib/html";
 
 export default function ProductDetail() {
 	const { id } = useParams();
@@ -71,7 +72,7 @@ export default function ProductDetail() {
 							<span>发布时间：{p.noteTime.slice(0, 16)}</span>
 							<span>浏览：{p.hits}</span>
 						</div>
-						<div className="rich" dangerouslySetInnerHTML={{ __html: p.content }} />
+						<div className="rich" dangerouslySetInnerHTML={{ __html: safeHtml(p.content) }} />
 						{p.memo ? (
 							<div className="rich" style={{ marginTop: 14, color: "#6b7280", fontSize: 14 }}>
 								{p.memo}

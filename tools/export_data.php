@@ -1,8 +1,22 @@
 <?php
 // 从 MariaDB 导出全部表结构与数据为 JSON（供 tools/migrate.mjs 写入 D1）
-$pdo = new PDO("mysql:host=172.16.20.243;port=24306;dbname=bjrobust;charset=utf8", "root", "7531591q", [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-]);
+// 凭据一律走环境变量，禁止再写死到源码里（历史上明文 root 密码已提交过，请轮换）：
+//   PHP_DB_HOST / PHP_DB_PORT / PHP_DB_NAME / PHP_DB_USER / PHP_DB_PASS
+$host = getenv('PHP_DB_HOST') ?: '172.16.20.243';
+$port = getenv('PHP_DB_PORT') ?: '24306';
+$db   = getenv('PHP_DB_NAME') ?: 'bjrobust';
+$user = getenv('PHP_DB_USER') ?: 'readonly';
+$pass = getenv('PHP_DB_PASS');
+if ($pass === false || $pass === '') {
+    fwrite(STDERR, "缺少 PHP_DB_PASS 环境变量（建议使用只读账号导出）\n");
+    exit(1);
+}
+$pdo = new PDO(
+    "mysql:host={$host};port={$port};dbname={$db};charset=utf8",
+    $user,
+    $pass,
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+);
 
 function mapType(string $mysqlType): string {
     // 取基础类型（去掉长度/精度括号）：int(11)/tinyint(1)/decimal(10,2) → int/tinyint/decimal

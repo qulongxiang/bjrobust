@@ -1,10 +1,11 @@
 // 前台数据 API：/api/site/*
+// 多站点：所有内容查询都带 SiteId（= 当前 Host 解析出的站点），存量数据归属站点 1（bjrobust）
 // 数据模型（与原库一致）：
 //   t_news 同时承载 新闻(NewType=3/5/6/7)、成功案例(NewType=4)、横幅(NewType=1/2)
 //   t_content 按 Called 存静态页（首页公司简介/公司概况/联系我们/地图/底部版权/首页联系方式/二维码）
 //   t_protype 两级产品类树（PID/TypeLevel）
 import { Hono } from "hono";
-import type { AppEnv, AdminVariables } from "../env";
+import type { AppEnv, AdminVariables, SiteInfo } from "../env";
 import { nowSql } from "../lib/auth";
 import { exec, rows } from "../lib/d1";
 
@@ -60,11 +61,29 @@ function pickProduct(r: Record<string, unknown>) {
 	};
 }
 
+// ---- 站点信息（前端套主题色/公司名/热线） ----
+app.get("/site-info", (c) => {
+	const s = c.get("site") as SiteInfo;
+	return c.json({
+		ok: true,
+		site: {
+			code: s.code,
+			name: s.name,
+			companyName: s.companyName,
+			hotline: s.hotline,
+			email: s.email,
+			logoUrl: s.logoUrl,
+			theme: s.theme,
+		},
+	});
+});
+
 // ---- 站点信息 + 静态片段（底部版权/联系方式/二维码等） ----
 app.get("/global", async (c) => {
 	const db = c.env.DB;
-	const g = await db.prepare("SELECT * FROM t_global WHERE Language = ? ORDER BY id LIMIT 1").bind(CN).first();
-	const fragRows = await rows(db.prepare("SELECT Called, Content FROM t_content WHERE Language = ?").bind(CN));
+	const siteId = c.get("siteId");
+	const g = await db.prepare("SELECT * FROM t_global WHERE SiteId = ? AND Language = ? ORDER BY id LIMIT 1").bind(siteId, CN).first();
+	const fragRows = await rows(db.prepare("SELECT Called, Content FROM t_content WHERE SiteId = ? AND Language = ?").bind(siteId, CN));
 	const fragments: Record<string, string> = {};
 	for (const r of fragRows) {
 		// 片段清洗：去掉 <script>（旧站残留的统计代码等），/upload/ 旧路径改写到 /assets/upload/（R2）
@@ -91,34 +110,35 @@ app.get("/global", async (c) => {
 // ---- 首页聚合 ----
 app.get("/home", async (c) => {
 	const db = c.env.DB;
-	const g = await db.prepare("SELECT * FROM t_global WHERE Language = ? ORDER BY id LIMIT 1").bind(CN).first();
+	const siteId = c.get("siteId");
+	const g = await db.prepare("SELECT * FROM t_global WHERE SiteId = ? AND Language = ? ORDER BY id LIMIT 1").bind(siteId, CN).first();
 	const aboutRow = await db
-		.prepare("SELECT Content FROM t_content WHERE Language = ? AND Called = ? LIMIT 1")
-		.bind(CN, "首页公司简介")
+		.prepare("SELECT Content FROM t_content WHERE SiteId = ? AND Language = ? AND Called = ? LIMIT 1")
+		.bind(siteId, CN, "首页公司简介")
 		.first();
 	const bannerRows = await rows(
 		db.prepare(
-			"SELECT id, Title, SmallPic, NoteTime, OrderBy FROM t_news WHERE IsShow = 1 AND NewType = 1 ORDER BY OrderBy DESC, id DESC LIMIT 10",
-		),
+			"SELECT id, Title, SmallPic, NoteTime, OrderBy FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 1 ORDER BY OrderBy DESC, id DESC LIMIT 10",
+		).bind(siteId),
 	);
 	const newsRows = await rows(
 		db.prepare(
-			"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits, WebTitle FROM t_news WHERE IsShow = 1 AND NewType = 3 ORDER BY OrderBy DESC, id DESC LIMIT 8",
-		),
+			"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits, WebTitle FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 3 ORDER BY OrderBy DESC, id DESC LIMIT 8",
+		).bind(siteId),
 	);
 	const productRows = await rows(
 		db.prepare(
-			"SELECT id, ProName, SmallPic, NoteTime, OrderBy, WebTitle FROM t_products WHERE IsShow = 1 AND IsCommend = 1 ORDER BY OrderBy DESC, id DESC LIMIT 12",
-		),
+			"SELECT id, ProName, SmallPic, NoteTime, OrderBy, WebTitle FROM t_products WHERE SiteId = ? AND IsShow = 1 AND IsCommend = 1 ORDER BY OrderBy DESC, id DESC LIMIT 12",
+		).bind(siteId),
 	);
 	const caseRows = await rows(
-		db.prepare("SELECT id, Title, SmallPic FROM t_news WHERE IsShow = 1 AND NewType = 4 ORDER BY OrderBy DESC, id DESC LIMIT 8"),
+		db.prepare("SELECT id, Title, SmallPic FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 4 ORDER BY OrderBy DESC, id DESC LIMIT 8").bind(siteId),
 	);
 	const brandRows = await rows(
-		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE IsShow = 1 AND NewType = 6 ORDER BY OrderBy DESC, id DESC LIMIT 12"),
+		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 6 ORDER BY OrderBy DESC, id DESC LIMIT 12").bind(siteId),
 	);
 	const partnerRows = await rows(
-		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE IsShow = 1 AND NewType = 7 ORDER BY OrderBy DESC, id DESC LIMIT 18"),
+		db.prepare("SELECT id, Title, SmallPic, LINK FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 7 ORDER BY OrderBy DESC, id DESC LIMIT 18").bind(siteId),
 	);
 	return c.json({
 		ok: true,
@@ -174,8 +194,9 @@ app.get("/home", async (c) => {
 
 // ---- 产品分类树 ----
 app.get("/product-types", async (c) => {
+	const siteId = c.get("siteId");
 	const rowsAll = await rows(
-		c.env.DB.prepare("SELECT id, Called, PID, TypeLevel, OrderBy, Memo, ParentPath FROM t_protype WHERE IsShow = 1 ORDER BY OrderBy, id"),
+		c.env.DB.prepare('SELECT id, Called, PID, TypeLevel, OrderBy, Memo, ParentPath FROM t_protype WHERE SiteId = ? AND IsShow = 1 ORDER BY OrderBy, id').bind(siteId),
 	);
 	const items = rowsAll.map((r) => ({
 		id: Number(r.id),
@@ -197,6 +218,7 @@ app.get("/product-types", async (c) => {
 // ---- 产品列表 ----
 app.get("/products", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const page = pageNum(c.req.query("page"));
 	const size = pageSize(c.req.query("pageSize"));
 	const typeId = c.req.query("typeId");
@@ -204,8 +226,8 @@ app.get("/products", async (c) => {
 	const bh = (c.req.query("bh") ?? "").trim().slice(0, 50);
 	const bz = (c.req.query("bz") ?? "").trim().slice(0, 50);
 	const kw = (c.req.query("kw") ?? "").trim().slice(0, 50);
-	const where: string[] = ["IsShow = 1"];
-	const params: (string | number)[] = [];
+	const where: string[] = ["SiteId = ?", "IsShow = 1"];
+	const params: (string | number)[] = [siteId];
 	if (typeId) {
 		where.push("TypeID = ?");
 		params.push(Number(typeId));
@@ -243,22 +265,23 @@ app.get("/products", async (c) => {
 // ---- 产品详情（含图集/上一件下一件/浏览数+1） ----
 app.get("/product/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	const rowPro = await db.prepare("SELECT * FROM t_products WHERE IsShow = 1 AND id = ?").bind(id).first();
+	const rowPro = await db.prepare("SELECT * FROM t_products WHERE SiteId = ? AND IsShow = 1 AND id = ?").bind(siteId, id).first();
 	if (!rowPro) return c.json({ error: "产品不存在" }, 404);
 	const typeId = Number(rowPro.TypeID ?? 0);
 	const order = Number(rowPro.OrderBy ?? 0);
 	const prev = await db
-		.prepare("SELECT id, ProName FROM t_products WHERE IsShow = 1 AND TypeID = ? AND OrderBy < ? ORDER BY OrderBy DESC, id DESC LIMIT 1")
-		.bind(typeId, order)
+		.prepare("SELECT id, ProName FROM t_products WHERE SiteId = ? AND IsShow = 1 AND TypeID = ? AND OrderBy < ? ORDER BY OrderBy DESC, id DESC LIMIT 1")
+		.bind(siteId, typeId, order)
 		.first();
 	const next = await db
-		.prepare("SELECT id, ProName FROM t_products WHERE IsShow = 1 AND TypeID = ? AND OrderBy > ? ORDER BY OrderBy ASC, id ASC LIMIT 1")
-		.bind(typeId, order)
+		.prepare("SELECT id, ProName FROM t_products WHERE SiteId = ? AND IsShow = 1 AND TypeID = ? AND OrderBy > ? ORDER BY OrderBy ASC, id ASC LIMIT 1")
+		.bind(siteId, typeId, order)
 		.first();
-	const imgRows = await rows(db.prepare("SELECT id, ProName, PicUrl, BigUrl, OrderBy FROM t_img WHERE ProID = ? ORDER BY OrderBy, id").bind(id));
-	const typeRow = await db.prepare("SELECT Called FROM t_protype WHERE id = ?").bind(typeId).first();
-	await exec(db.prepare("UPDATE t_products SET Hits = Hits + 1 WHERE id = ?"), id);
+	const imgRows = await rows(db.prepare("SELECT id, ProName, PicUrl, BigUrl, OrderBy FROM t_img WHERE SiteId = ? AND ProID = ? ORDER BY OrderBy, id").bind(siteId, id));
+	const typeRow = await db.prepare("SELECT Called FROM t_protype WHERE SiteId = ? AND id = ?").bind(siteId, typeId).first();
+	await exec(db.prepare("UPDATE t_products SET Hits = Hits + 1 WHERE SiteId = ? AND id = ?"), siteId, id);
 	return c.json({
 		ok: true,
 		product: {
@@ -278,7 +301,7 @@ app.get("/product/:id", async (c) => {
 	});
 });
 
-type Ctx = Parameters<(c: never) => void> extends never ? never : import("hono").Context<{
+type Ctx = import("hono").Context<{
 	Bindings: AppEnv;
 	Variables: AdminVariables;
 }>;
@@ -286,12 +309,13 @@ type Ctx = Parameters<(c: never) => void> extends never ? never : import("hono")
 // ---- 内页 banner（NewType=2）：各内页头部配图，取第一条展示 ----
 app.get("/page-banner", async (c) => {
 	const r = await c.env.DB
-		.prepare("SELECT Title, SmallPic FROM t_news WHERE IsShow = 1 AND NewType = 2 ORDER BY OrderBy DESC, id DESC LIMIT 1")
+		.prepare("SELECT Title, SmallPic FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 2 ORDER BY OrderBy DESC, id DESC LIMIT 1")
+		.bind(c.get("siteId"))
 		.first();
 	return c.json({ ok: true, title: r ? String(r.Title ?? "") : "", pic: r ? String(r.SmallPic ?? "") : "" });
 });
 
-// ---- 新闻分类（前台 tab 用；1/2 为 banner 内部类型，不展示） ----
+// ---- 新闻分类（前台 tab 用；1/2 为 banner 内部类型，不展示。分类是结构性字典，全站共用） ----
 app.get("/news-types", async (c) => {
 	const list = await rows(c.env.DB.prepare("SELECT id, Called FROM t_newtype WHERE id IN (3,4,5,6,7) ORDER BY id"));
 	return c.json(list.map((r) => ({ id: Number(r.id), name: String(r.Called ?? "") })));
@@ -300,19 +324,20 @@ app.get("/news-types", async (c) => {
 // ---- 新闻列表（type: 3=公司新闻 4=成功案例 5=技术支持 6=代理品牌 7=合作伙伴） ----
 app.get("/news", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const page = pageNum(c.req.query("page"));
 	const size = pageSize(c.req.query("pageSize"));
 	const type = Number(c.req.query("type") ?? 3);
 	const totalRow = await db
-		.prepare("SELECT COUNT(*) AS n FROM t_news WHERE IsShow = 1 AND NewType = ?")
-		.bind(type)
+		.prepare("SELECT COUNT(*) AS n FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = ?")
+		.bind(siteId, type)
 		.first();
 	const list = await rows(
 		db
 			.prepare(
-				"SELECT id, Title, NoteTime, SmallPic, Memo, OrderBy, Hits, WebTitle FROM t_news WHERE IsShow = 1 AND NewType = ? ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
+				"SELECT id, Title, NoteTime, SmallPic, Memo, OrderBy, Hits, WebTitle FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = ? ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
 			)
-			.bind(type, size, (page - 1) * size),
+			.bind(siteId, type, size, (page - 1) * size),
 	);
 	const typeRow = await db.prepare("SELECT Called FROM t_newtype WHERE id = ?").bind(type).first();
 	return c.json({
@@ -335,19 +360,20 @@ app.get("/news", async (c) => {
 // ---- 新闻/案例详情（共用：t_news 按 NewType 区分） ----
 async function newsDetail(c: Ctx, id: number) {
 	const db = c.env.DB;
-	const rowNews = await db.prepare("SELECT * FROM t_news WHERE IsShow = 1 AND id = ?").bind(id).first();
+	const siteId = c.get("siteId");
+	const rowNews = await db.prepare("SELECT * FROM t_news WHERE SiteId = ? AND IsShow = 1 AND id = ?").bind(siteId, id).first();
 	if (!rowNews) return c.json({ error: "内容不存在" }, 404);
 	const nt = Number(rowNews.NewType ?? 0);
 	const order = Number(rowNews.OrderBy ?? 0);
 	const prev = await db
-		.prepare("SELECT id, Title FROM t_news WHERE IsShow = 1 AND NewType = ? AND OrderBy < ? ORDER BY OrderBy DESC, id DESC LIMIT 1")
-		.bind(nt, order)
+		.prepare("SELECT id, Title FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = ? AND OrderBy < ? ORDER BY OrderBy DESC, id DESC LIMIT 1")
+		.bind(siteId, nt, order)
 		.first();
 	const next = await db
-		.prepare("SELECT id, Title FROM t_news WHERE IsShow = 1 AND NewType = ? AND OrderBy > ? ORDER BY OrderBy ASC, id ASC LIMIT 1")
-		.bind(nt, order)
+		.prepare("SELECT id, Title FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = ? AND OrderBy > ? ORDER BY OrderBy ASC, id ASC LIMIT 1")
+		.bind(siteId, nt, order)
 		.first();
-	await exec(db.prepare("UPDATE t_news SET Hits = Hits + 1 WHERE id = ?"), id);
+	await exec(db.prepare("UPDATE t_news SET Hits = Hits + 1 WHERE SiteId = ? AND id = ?"), siteId, id);
 	return c.json({
 		ok: true,
 		news: pickNews(rowNews),
@@ -362,15 +388,16 @@ app.get("/case/:id", (c) => newsDetail(c, Number(c.req.param("id"))));
 // ---- 成功案例列表（t_news NewType=4） ----
 app.get("/cases", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const page = pageNum(c.req.query("page"));
 	const size = pageSize(c.req.query("pageSize"));
-	const totalRow = await db.prepare("SELECT COUNT(*) AS n FROM t_news WHERE IsShow = 1 AND NewType = 4").first();
+	const totalRow = await db.prepare("SELECT COUNT(*) AS n FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 4").bind(siteId).first();
 	const list = await rows(
 		db
 			.prepare(
-				"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits FROM t_news WHERE IsShow = 1 AND NewType = 4 ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
+				"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 4 ORDER BY OrderBy DESC, id DESC LIMIT ? OFFSET ?",
 			)
-			.bind(size, (page - 1) * size),
+			.bind(siteId, size, (page - 1) * size),
 	);
 	return c.json({
 		ok: true,
@@ -389,10 +416,11 @@ app.get("/cases", async (c) => {
 
 // ---- 静态页（公司概况/联系我们/地图/底部版权…） ----
 app.get("/page/:called", async (c) => {
+	const siteId = c.get("siteId");
 	const called = c.req.param("called");
 	const rowPage = await c.env.DB
-		.prepare("SELECT Content, NoteTime FROM t_content WHERE Language = ? AND Called = ? LIMIT 1")
-		.bind(CN, called)
+		.prepare("SELECT Content, NoteTime FROM t_content WHERE SiteId = ? AND Language = ? AND Called = ? LIMIT 1")
+		.bind(siteId, CN, called)
 		.first();
 	if (!rowPage) return c.json({ error: "页面不存在" }, 404);
 	return c.json({
@@ -403,9 +431,10 @@ app.get("/page/:called", async (c) => {
 	});
 });
 
-// ---- 留言提交（限流：同 IP 5 分钟内最多 3 条） ----
+// ---- 留言提交（限流：同站点同 IP 5 分钟内最多 3 条） ----
 app.post("/feedback", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	let body: { name?: unknown; content?: unknown } | null = null;
 	try {
 		body = await c.req.json();
@@ -417,17 +446,29 @@ app.post("/feedback", async (c) => {
 	if (!name || !content) return c.json({ error: "姓名与内容不能为空" }, 400);
 	const ip = (c.req.header("cf-connecting-ip") ?? "local").slice(0, 45);
 	const recent = await db
-		.prepare("SELECT COUNT(*) AS n FROM t_feedback WHERE IP = ? AND NoteTime > ?")
-		.bind(ip, nowSql(-5))
+		.prepare("SELECT COUNT(*) AS n FROM t_feedback WHERE SiteId = ? AND IP = ? AND NoteTime > ?")
+		.bind(siteId, ip, nowSql(-5))
 		.first();
 	if (recent && Number(recent.n) >= 3) return c.json({ error: "留言过于频繁，请稍后再试" }, 429);
-	await exec(db.prepare("INSERT INTO t_feedback (Name, Content, NoteTime, IP, Language) VALUES (?, ?, ?, ?, ?)"), name, content, nowSql(), ip, CN);
+	await exec(
+		db.prepare("INSERT INTO t_feedback (SiteId, Name, Content, NoteTime, IP, Language) VALUES (?, ?, ?, ?, ?, ?)"),
+		siteId,
+		name,
+		content,
+		nowSql(),
+		ip,
+		CN,
+	);
 	return c.json({ ok: true });
 });
 
 export default app;
 
-// ---- R2 图片：/assets/<key>（key 形如 upload/xx.jpg，对应原 upload/ 目录） ----
+// ---- R2 图片：/assets/<key> ----
+// 分站规则：
+//   bjrobust 的历史图片保持 upload/<文件名>、cn-banner/<文件名>（原站目录）
+//   新上传走 upload/<站点 Code>/<文件名>、cn-banner/<站点 Code>/<文件名>
+// 读取时先试精确 key，再按当前站点前缀回退，最后回退老站前缀（兼容存量数据）
 const MIME_BY_EXT: Record<string, string> = {
 	".jpg": "image/jpeg",
 	".jpeg": "image/jpeg",
@@ -441,27 +482,44 @@ const MIME_BY_EXT: Record<string, string> = {
 	".zip": "application/zip",
 };
 
-function contentTypeOf(key: string, fallback?: string): string {
-	const ext = key.slice(key.lastIndexOf(".")).toLowerCase();
+export function contentTypeOf(key: string, fallback?: string): string {
+	const dot = key.lastIndexOf(".");
+	const ext = dot >= 0 ? key.slice(dot).toLowerCase() : "";
 	return fallback ?? MIME_BY_EXT[ext] ?? "application/octet-stream";
 }
 
-export const assetsApp = new Hono<{ Bindings: AppEnv }>();
+export const assetsApp = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 assetsApp.get("/*", async (c) => {
 	const bucket = c.env.IMAGES;
 	if (!bucket) return c.notFound(); // R2 未开通
+	const site = c.get("site") as SiteInfo | undefined;
+	const code = site?.code ?? "";
 	let key = c.req.path.replace(/^\/assets\//, "");
 	if (!key) return c.notFound();
-	let obj = await bucket.get(key);
-	// 兼容库内裸文件名（无 upload/ 前缀）
-	if (!obj && !key.startsWith("upload/")) {
-		obj = await bucket.get("upload/" + key);
-		key = "upload/" + key;
+
+	const tries: string[] = [key];
+	if (code) {
+		if (key.startsWith("upload/")) tries.push("upload/" + code + "/" + key.slice("upload/".length));
+		else if (key.startsWith("cn-banner/")) tries.push("cn-banner/" + code + "/" + key.slice("cn-banner/".length));
+		else tries.push("upload/" + code + "/" + key);
+	}
+	// 兼容库内裸文件名（无 upload/ 前缀）的历史图片
+	if (!key.startsWith("upload/") && !key.startsWith("cn-banner/")) tries.push("upload/" + key);
+
+	let obj: Awaited<ReturnType<typeof bucket.get>> = null;
+	let hitKey = key;
+	for (const t of tries) {
+		const o = await bucket.get(t);
+		if (o) {
+			obj = o;
+			hitKey = t;
+			break;
+		}
 	}
 	if (!obj) return c.notFound();
 	return new Response(obj.body, {
 		headers: {
-			"Content-Type": contentTypeOf(key, obj.httpMetadata?.contentType),
+			"Content-Type": contentTypeOf(hitKey, obj.httpMetadata?.contentType),
 			"Cache-Control": "public, max-age=86400",
 		},
 	});

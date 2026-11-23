@@ -1,4 +1,4 @@
-// 后台：新闻/案例管理（t_news + t_newtype）
+// 后台：新闻/案例管理（t_news + t_newtype）—— 所有读写都限定在当前站点（SiteId）
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
@@ -34,16 +34,17 @@ function pick(r: Record<string, unknown>) {
 
 app.get("/news", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const page = Math.max(parseInt(c.req.query("page") ?? "1", 10), 1);
 	const size = Math.min(Math.max(parseInt(c.req.query("pageSize") ?? "15", 10), 1), 100);
 	const type = c.req.query("type");
-	const where: string[] = [];
-	const params: (string | number)[] = [];
+	const where: string[] = ['"SiteId" = ?'];
+	const params: (string | number)[] = [siteId];
 	if (type) {
 		where.push("NewType = ?");
 		params.push(Number(type));
 	}
-	const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+	const whereSql = "WHERE " + where.join(" AND ");
 	const total = await count(db.prepare(`SELECT COUNT(*) AS n FROM t_news ${whereSql}`).bind(...params));
 	const list = await rows(
 		db
@@ -55,6 +56,7 @@ app.get("/news", async (c) => {
 
 app.post("/news", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
 	const title = String(b.title ?? "").trim().slice(0, 255);
@@ -62,8 +64,9 @@ app.post("/news", async (c) => {
 	const now = nowSql();
 	const res = await exec(
 		db.prepare(
-			"INSERT INTO t_news (Title, NoteTime, Content, UserName, IsShow, IsCommend, OrderBy, NewType, Hits, Language, Parent, SmallPic, WebTitle, WebKey, WebDesc, ShowTime, SJ, LINK, DOWN, MEMO) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+			'INSERT INTO t_news ("SiteId", Title, NoteTime, Content, UserName, IsShow, IsCommend, OrderBy, NewType, Hits, Language, Parent, SmallPic, WebTitle, WebKey, WebDesc, ShowTime, SJ, LINK, DOWN, MEMO) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
 		),
+		siteId,
 		title,
 		now,
 		String(b.content ?? ""),
@@ -107,6 +110,7 @@ const UPDATABLE: Record<string, string> = {
 
 app.put("/news/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
@@ -120,18 +124,18 @@ app.put("/news/:id", async (c) => {
 		sets.push(`${col} = ?`);
 	}
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
-	const res = await db.prepare(`UPDATE t_news SET ${sets.join(", ")} WHERE id = ?`).bind(...params, id).run();
+	const res = await db.prepare(`UPDATE t_news SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
 app.delete("/news/:id", async (c) => {
-	const res = await exec(c.env.DB.prepare("DELETE FROM t_news WHERE id = ?"), Number(c.req.param("id")));
+	const res = await exec(c.env.DB.prepare('DELETE FROM t_news WHERE "SiteId" = ? AND id = ?'), c.get("siteId"), Number(c.req.param("id")));
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
 	return c.json({ ok: true });
 });
 
-// ---- 新闻分类（t_newtype） ----
+// ---- 新闻分类（t_newtype，结构性字典，全站共用） ----
 app.get("/news-types", async (c) => {
 	const list = await rows(c.env.DB.prepare("SELECT id, Called, Language FROM t_newtype ORDER BY id"));
 	return c.json({ ok: true, items: list.map((r) => ({ id: Number(r.id), name: String(r.Called ?? "") })) });
@@ -160,8 +164,9 @@ app.put("/news-types/:id", async (c) => {
 
 app.delete("/news-types/:id", async (c) => {
 	const db = c.env.DB;
+	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	const used = await count(db.prepare("SELECT COUNT(*) AS n FROM t_news WHERE NewType = ?").bind(id));
+	const used = await count(db.prepare('SELECT COUNT(*) AS n FROM t_news WHERE "SiteId" = ? AND NewType = ?').bind(siteId, id));
 	if (used > 0) return c.json({ error: "该分类下仍有内容，不能删除" }, 400);
 	const res = await exec(db.prepare("DELETE FROM t_newtype WHERE id = ?"), id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);

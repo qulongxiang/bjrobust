@@ -5,34 +5,40 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import AdminLayout, { type AdminCtx } from "./AdminLayout";
 import Login from "./Login";
-import { adminApi, type AdminUser } from "./api";
+import { adminApi, setActiveSiteCode, type AdminUser, type SiteSummary, type SiteTheme } from "./api";
+
+type MeState = {
+	user: AdminUser;
+	site: { code: string; name: string; companyName: string; theme: SiteTheme };
+	sites: SiteSummary[];
+};
 
 // 会话检查（登录页与守卫共用）
 function useMe() {
-	const [user, setUser] = useState<AdminUser | null>(null);
+	const [me, setMe] = useState<MeState | null>(null);
 	const [checking, setChecking] = useState(true);
 	useEffect(() => {
 		adminApi
 			.me()
-			.then((d) => setUser(d.user))
-			.catch(() => setUser(null))
+			.then((d) => setMe({ user: d.user, site: d.site, sites: d.sites }))
+			.catch(() => setMe(null))
 			.finally(() => setChecking(false));
 	}, []);
-	return { user, setUser, checking };
+	return { me, setMe, checking };
 }
 
 /** /admin/login：未登录显示表单；已登录直接进后台 */
 export function AdminLogin() {
-	const { user, checking } = useMe();
+	const { me, checking } = useMe();
 	const navigate = useNavigate();
 	if (checking) return <div className="admin-loading">加载中…</div>;
-	if (user) return <Navigate to="/admin/stats" replace />;
+	if (me) return <Navigate to="/admin/stats" replace />;
 	return <Login onLogin={() => navigate("/admin/stats")} />;
 }
 
 /** /admin/*：登录守卫 + 后台布局，子路由来自 App.tsx */
 export default function AdminApp() {
-	const { user, setUser, checking } = useMe();
+	const { me, setMe, checking } = useMe();
 	const navigate = useNavigate();
 
 	const onLogout = async () => {
@@ -41,16 +47,28 @@ export default function AdminApp() {
 		} catch {
 			/* 忽略退出时的网络错误 */
 		}
-		setUser(null);
+		setMe(null);
 		navigate("/admin/login");
 	};
 
-	if (checking) return <div className="admin-loading">加载中…</div>;
-	if (!user) return <Navigate to="/admin/login" replace />;
+	// 超管切换站点：写入 localStorage 并刷新页面（各页面数据量不同，直接重载最省事也最不容易残留旧数据）
+	const onSwitchSite = (code: string) => {
+		setActiveSiteCode(code);
+		location.reload();
+	};
 
-	const ctx: AdminCtx = { user, onLogout };
+	if (checking) return <div className="admin-loading">加载中…</div>;
+	if (!me) return <Navigate to="/admin/login" replace />;
+
+	const ctx: AdminCtx = { user: me.user, onLogout };
 	return (
-		<AdminLayout user={user} onLogout={onLogout}>
+		<AdminLayout
+			user={me.user}
+			site={me.site}
+			sites={me.sites}
+			onSwitchSite={onSwitchSite}
+			onLogout={onLogout}
+		>
 			{/* Outlet context 供子页面（如 UserAdmin）用 useOutletContext 读取 */}
 			<Outlet context={ctx} />
 		</AdminLayout>

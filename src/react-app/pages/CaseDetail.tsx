@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, imgUrl, type NewsDetailData } from "../api";
 import PageHero from "../components/PageHero";
+import { safeHtml } from "../lib/html";
 
 export default function CaseDetail() {
 	const { id } = useParams();
@@ -53,7 +54,7 @@ export default function CaseDetail() {
 							<span>发布时间：{n.noteTime.slice(0, 16)}</span>
 							<span>浏览：{n.hits}</span>
 						</div>
-						<div className="rich" dangerouslySetInnerHTML={{ __html: n.content }} />
+						<div className="rich" dangerouslySetInnerHTML={{ __html: safeHtml(n.content) }} />
 						<div className="prev-next">
 							<span>
 								上一案例：

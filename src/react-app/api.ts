@@ -8,6 +8,19 @@ export type GlobalInfo = {
 	web: string;
 } | null;
 
+export type SiteTheme = { primary?: string; primaryDark?: string; accent?: string };
+
+/** 当前域名对应的站点（多站点部署时由后端按 Host 解析） */
+export type SiteMeta = {
+	code: string;
+	name: string;
+	companyName: string;
+	hotline: string;
+	email: string;
+	logoUrl: string;
+	theme: SiteTheme;
+};
+
 export type HomeData = {
 	global: GlobalInfo;
 	about: string;
@@ -82,6 +95,13 @@ export function imgUrl(path?: string | null): string {
 	return `/assets/${path.replace(/^\//, "")}`;
 }
 
+/** 已是 /assets/ 或完整 URL 的资源（站点 Logo 等）直接用，避免拼成 /assets//assets/ */
+export function assetUrl(path?: string | null): string {
+	if (!path) return "";
+	if (/^(https?:)?\/\//.test(path) || path.startsWith("/assets/") || path.startsWith("data:")) return path;
+	return `/assets/${path.replace(/^\//, "")}`;
+}
+
 async function get<T>(url: string): Promise<T> {
 	const res = await fetch(url, { headers: { Accept: "application/json" } });
 	if (!res.ok) throw new Error(`API ${res.status}: ${url}`);
@@ -89,6 +109,8 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
+	/** 当前域名对应站点（多站点共用一套部署时用它取品牌信息） */
+	site: () => get<{ ok: boolean; site: SiteMeta }>("/api/site/site-info"),
 	home: () => get<HomeData>("/api/site/home"),
 	global: () => get<GlobalData>("/api/site/global"),
 	pageBanner: () => get<{ title: string; pic: string }>("/api/site/page-banner"),
