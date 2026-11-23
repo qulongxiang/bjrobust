@@ -32,29 +32,31 @@ export default function Home() {
 
 	return (
 		<>
-			{/* banner：纯图轮播（无文字压图），6 秒自动切换 */}
-			<div className="hero">
-				{d.banners.map((b, i) => (
-					<img
-						key={b.id}
-						src={imgUrl(b.pic)}
-						alt={b.title}
-						className={`hero-img ${i === slide ? "on" : ""}`}
-					/>
-				))}
-				{d.banners.length > 1 ? (
-					<div className="hero-dots">
-						{d.banners.map((b, i) => (
-							<button
-								key={b.id}
-								className={i === slide ? "on" : ""}
-								aria-label={`banner-${i + 1}`}
-								onClick={() => setSlide(i)}
-							/>
-						))}
-					</div>
-				) : null}
-			</div>
+			{/* banner：纯图轮播（无文字压图），6 秒自动切换；新站点没有 banner 时不占位 */}
+			{d.banners.length ? (
+				<div className="hero">
+					{d.banners.map((b, i) => (
+						<img
+							key={b.id}
+							src={imgUrl(b.pic)}
+							alt={b.title}
+							className={`hero-img ${i === slide ? "on" : ""}`}
+						/>
+					))}
+					{d.banners.length > 1 ? (
+						<div className="hero-dots">
+							{d.banners.map((b, i) => (
+								<button
+									key={b.id}
+									className={i === slide ? "on" : ""}
+									aria-label={`banner-${i + 1}`}
+									onClick={() => setSlide(i)}
+								/>
+							))}
+						</div>
+					) : null}
+				</div>
+			) : null}
 
 			{/* 快速查找产品（还原旧站）：编号 / 标准 / 关键词 */}
 			<div className="home-search">
