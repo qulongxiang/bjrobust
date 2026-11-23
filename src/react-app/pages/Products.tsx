@@ -60,7 +60,7 @@ export default function Products() {
 	return (
 		<>
 			<PageHero
-				banner="cn-banner/banner2.jpg"
+				page="products"
 				title="产品中心"
 				crumb={
 					<>

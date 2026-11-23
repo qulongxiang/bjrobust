@@ -101,7 +101,7 @@ export default function Contact() {
 	return (
 		<>
 			<PageHero
-				banner="cn-banner/banner6.jpg"
+				page="contact"
 				title="联系我们"
 				crumb={
 					<>

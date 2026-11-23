@@ -25,7 +25,7 @@ export default function News() {
 	return (
 		<>
 			<PageHero
-				banner="cn-banner/banner3.jpg"
+				page="news"
 				title="新闻资讯"
 				crumb={
 					<>

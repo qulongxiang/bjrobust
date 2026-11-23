@@ -1,8 +1,8 @@
-// 站点设置（t_global）+ 静态页（t_content）编辑 + 内页头图管理（R2 cn-banner/）
+// 站点设置（t_global）+ 静态页（t_content）+ 品牌主题（t_sites）+ 内页头图（t_banner，每页一张）
 import { useEffect, useState } from "react";
 import { adminApi, type ContentPage, type GlobalSettings, type SiteMetaInfo } from "../api";
 
-type BannerItem = { name: string; page: string; url: string; size: number; updated: string | null };
+type BannerItem = { page: string; label: string; pic: string; url: string; updated: string };
 
 export default function SiteAdmin() {
 	const [global, setGlobal] = useState<GlobalSettings>(null);
@@ -86,15 +86,29 @@ export default function SiteAdmin() {
 		}
 	};
 
-	const onBannerFile = async (name: string, file: File | null) => {
+	const onBannerFile = async (page: string, file: File | null) => {
 		if (!file) return;
-		setBannerBusy(name);
+		setBannerBusy(page);
 		try {
-			await adminApi.replaceBanner(name, file);
+			await adminApi.replaceBanner(page, file);
 			flash(true, "头图已替换");
 			await loadBanners();
 		} catch (e) {
 			flash(false, e instanceof Error ? e.message : "上传失败");
+		} finally {
+			setBannerBusy(null);
+		}
+	};
+
+	const onBannerClear = async (b: BannerItem) => {
+		if (!confirm(`清除「${b.label}」的头图？（前台会退回主题色渐变底，图片文件保留）`)) return;
+		setBannerBusy(b.page);
+		try {
+			await adminApi.clearBanner(b.page);
+			flash(true, "头图已清除");
+			await loadBanners();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "操作失败");
 		} finally {
 			setBannerBusy(null);
 		}
@@ -227,36 +241,42 @@ export default function SiteAdmin() {
 			</div>
 
 			<div className="admin-panel">
-				<h3 style={{ marginTop: 0 }}>内页头图（各内页顶部整宽纯图，后台可直接替换）</h3>
+				<h3 style={{ marginTop: 0 }}>内页头图（每页一张，存数据库，各站点独立）</h3>
 				<p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-					建议尺寸 1200–1920 宽、高 300–450，≤5MB（jpg/png/webp）。替换后前台强刷（Ctrl+F5）即可看到。
+					建议尺寸 1200–1920 宽、高 300–450，≤5MB（jpg/png/webp）。这里改的是<b>当前站点</b>的头图，其它站点互不影响；清除后前台退回主题色渐变底。
 				</p>
 				<div className="banner-grid">
 					{banners.map((b) => (
-						<div className="banner-slot" key={b.name}>
-							<img
-								src={b.updated ? `${b.url}?v=${encodeURIComponent(b.updated)}` : b.url}
-								alt={b.page}
-							/>
+						<div className="banner-slot" key={b.page}>
+							{b.url ? (
+								<img src={b.updated ? `${b.url}?v=${encodeURIComponent(b.updated)}` : b.url} alt={b.label} />
+							) : (
+								<div className="banner-slot-empty">未配置（前台显示主题渐变）</div>
+							)}
 							<div className="banner-slot-meta">
-								<span>{b.page}</span>
+								<span>{b.label}</span>
 								<label className="btn small">
-									{bannerBusy === b.name ? "上传中…" : "替换"}
+									{bannerBusy === b.page ? "上传中…" : b.url ? "替换" : "上传"}
 									<input
 										type="file"
-										accept="image/jpeg,image/png,image/webp"
+										accept="image/jpeg,image/png,image/gif,image/webp"
 										hidden
-										disabled={bannerBusy === b.name}
+										disabled={bannerBusy === b.page}
 										onChange={(e) => {
-											onBannerFile(b.name, e.target.files?.[0] ?? null);
+											onBannerFile(b.page, e.target.files?.[0] ?? null);
 											e.target.value = "";
 										}}
 									/>
 								</label>
+								{b.url ? (
+									<button className="btn small" disabled={bannerBusy === b.page} onClick={() => onBannerClear(b)}>
+										清除
+									</button>
+								) : null}
 							</div>
 						</div>
 					))}
-					{!banners.length ? <div className="empty-tip">头图加载失败（R2 未开通？）</div> : null}
+					{!banners.length ? <div className="empty-tip">头图加载失败（请检查登录状态）</div> : null}
 				</div>
 			</div>
 

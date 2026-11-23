@@ -251,13 +251,14 @@ export const adminApi = {
 		}>("/api/admin/stats"),
 
 	bannerList: () =>
-		req<{ ok: boolean; items: { name: string; page: string; url: string; size: number; updated: string | null }[] }>(
-			"/api/admin/banners",
-		),
-	replaceBanner: (name: string, file: File): Promise<{ ok: boolean }> => {
+		req<{
+			ok: boolean;
+			items: { page: string; label: string; pic: string; url: string; updated: string }[];
+		}>("/api/admin/banners"),
+	replaceBanner: (page: string, file: File): Promise<{ ok: boolean }> => {
 		const form = new FormData();
 		form.append("file", file);
-		return fetch(`/api/admin/banners/${name}`, {
+		return fetch(`/api/admin/banners/${page}`, {
 			method: "PUT",
 			credentials: "same-origin",
 			headers: {
@@ -271,6 +272,9 @@ export const adminApi = {
 			return d as { ok: true };
 		});
 	},
+
+	clearBanner: (page: string) =>
+		req<{ ok: boolean }>(`/api/admin/banners/${page}`, { method: "DELETE" }),
 
 	uploadFiles: (file: File): Promise<{ ok: boolean; path: string; url: string }> => {
 		const form = new FormData();

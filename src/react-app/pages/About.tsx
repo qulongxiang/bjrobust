@@ -25,7 +25,7 @@ export default function About() {
 	return (
 		<>
 			<PageHero
-				banner="cn-banner/banner1.jpg"
+				page="about"
 				title="公司概况"
 				crumb={
 					<>

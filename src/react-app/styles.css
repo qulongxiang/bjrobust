@@ -965,6 +965,14 @@
 	display: none;
 }
 
+/* 该站点这一页还没配置头图：用主题色渐变撑起高度，避免只剩一条细线 */
+.page-hero--empty {
+	min-height: 180px;
+	background:
+		radial-gradient(120% 140% at 15% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
+		linear-gradient(120deg, var(--primary-dark), var(--primary) 60%, var(--accent-strong, #ff9f00) 160%);
+}
+
 .page-titlebar {
 	background: #fff;
 	border-bottom: 1px solid var(--border);

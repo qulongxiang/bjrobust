@@ -114,6 +114,8 @@ export const api = {
 	home: () => get<HomeData>("/api/site/home"),
 	global: () => get<GlobalData>("/api/site/global"),
 	pageBanner: () => get<{ title: string; pic: string }>("/api/site/page-banner"),
+	/** 内页头图（按页面键，每站独立配置） */
+	banners: () => get<{ ok: boolean; pages: Record<string, { title: string; pic: string }> }>("/api/site/banners"),
 	productTypes: () =>
 		get<{ items: ProTypeItem[]; tree: ProTypeItem[] }>("/api/site/product-types"),
 	products: (

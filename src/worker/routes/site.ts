@@ -306,6 +306,22 @@ type Ctx = import("hono").Context<{
 	Variables: AdminVariables;
 }>;
 
+// ---- 内页头图（t_banner）：每站每个页面一张，后台可逐页替换；未配置的页面由前端用主题渐变兜底 ----
+app.get("/banners", async (c) => {
+	const list = await rows(
+		c.env.DB.prepare('SELECT "Page", "Title", "Pic" FROM t_banner WHERE "SiteId" = ? AND "IsShow" = 1').bind(
+			c.get("siteId"),
+		),
+	);
+	const pages: Record<string, { title: string; pic: string }> = {};
+	for (const r of list) {
+		const page = String(r.Page ?? "");
+		if (!page) continue;
+		pages[page] = { title: String(r.Title ?? ""), pic: String(r.Pic ?? "") };
+	}
+	return c.json({ ok: true, pages });
+});
+
 // ---- 内页 banner（NewType=2）：各内页头部配图，取第一条展示 ----
 app.get("/page-banner", async (c) => {
 	const r = await c.env.DB

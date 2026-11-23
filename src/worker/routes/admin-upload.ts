@@ -3,6 +3,7 @@
 // bjrobust 的历史图片仍在 upload/、cn-banner/ 老前缀下，读取时由 /assets 路由回退兼容
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
+import { nowSql } from "../lib/auth";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -98,66 +99,109 @@ app.delete("/upload", async (c) => {
 	return c.json({ ok: true });
 });
 
-// ---- 内页头图（对应原版 PHP 站 cn/banner/ 六个固定位） ----
-const BANNERS = [
-	{ name: "banner1.jpg", page: "公司概况" },
-	{ name: "banner2.jpg", page: "产品中心" },
-	{ name: "banner3.jpg", page: "新闻资讯" },
-	{ name: "banner4.jpg", page: "成功案例" },
-	{ name: "banner5.jpg", page: "技术支持" },
-	{ name: "banner6.jpg", page: "联系我们" },
+// ---- 内页头图（每站每个页面一张，存在 t_banner，可覆盖默认图） ----
+// 页面键与前端路由一致；bjrobust 的存量图仍在 R2 的 cn-banner/bannerN.jpg，
+// 迁移时写入数据库作为初始值，后续替换的图落到本站前缀 cn-banner/<code>/。
+const BANNER_PAGES: { page: string; label: string }[] = [
+	{ page: "about", label: "公司概况" },
+	{ page: "products", label: "产品中心" },
+	{ page: "news", label: "新闻资讯" },
+	{ page: "cases", label: "成功案例" },
+	{ page: "support", label: "技术支持" },
+	{ page: "contact", label: "联系我们" },
 ];
 
-function bannerKeys(siteCode: string, name: string): string[] {
-	const own = `cn-banner/${siteCode}/${name}`;
-	return siteCode === "bjrobust" ? [own, `cn-banner/${name}`] : [own];
+async function readBannerRows(env: AppEnv, siteId: number) {
+	const res = await env.DB.prepare(
+		'SELECT "Page", "Title", "Pic", "NoteTime" FROM t_banner WHERE "SiteId" = ?',
+	)
+		.bind(siteId)
+		.all();
+	return (res.results ?? []) as Record<string, unknown>[];
+}
+
+function bannerRes(row: Record<string, unknown> | undefined): { pic: string; title: string; noteTime: string } {
+	return {
+		pic: String(row?.Pic ?? ""),
+		title: String(row?.Title ?? ""),
+		noteTime: String(row?.NoteTime ?? ""),
+	};
 }
 
 app.get("/banners", async (c) => {
-	if (!c.env.IMAGES) return c.json({ error: R2_OFF_HINT }, 503);
-	const site = c.get("site");
-	const items = [];
-	for (const b of BANNERS) {
-		const keys = bannerKeys(site.code, b.name);
-		let hit: string | null = null;
-		let meta: { size: number; uploaded: unknown } | null = null;
-		for (const k of keys) {
-			const obj = await c.env.IMAGES.head(k);
-			if (obj) {
-				hit = k;
-				meta = obj;
-				break;
-			}
-		}
-		items.push({
-			name: b.name,
+	const siteId = c.get("siteId");
+	const rows = await readBannerRows(c.env, siteId);
+	const map = new Map(rows.map((r) => [String(r.Page ?? ""), r]));
+	const items = BANNER_PAGES.map((b) => {
+		const r = bannerRes(map.get(b.page));
+		return {
 			page: b.page,
-			url: `/assets/${hit ?? keys[0]}`,
-			size: meta?.size ?? 0,
-			updated: meta ? String(meta.uploaded ?? "") : null,
-		});
-	}
+			label: b.label,
+			pic: r.pic,
+			url: r.pic ? `/assets/${r.pic.replace(/^\//, "")}` : "",
+			updated: r.noteTime,
+		};
+	});
 	return c.json({ ok: true, items });
 });
 
-app.put("/banners/:name", async (c) => {
+app.put("/banners/:page", async (c) => {
 	if (!c.env.IMAGES) return c.json({ error: R2_OFF_HINT }, 503);
 	const site = c.get("site");
-	const name = c.req.param("name");
-	if (!BANNERS.some((b) => b.name === name)) return c.json({ error: "未知头图" }, 400);
+	const siteId = c.get("siteId");
+	const page = c.req.param("page");
+	if (!BANNER_PAGES.some((b) => b.page === page)) return c.json({ error: "未知头图页面" }, 400);
 	const form = await c.req.formData().catch(() => null);
 	if (!form) return c.json({ error: "请求格式错误" }, 400);
 	const file = form.get("file");
 	if (!(file instanceof File)) return c.json({ error: "缺少 file 字段" }, 400);
 	if (file.size > MAX_SIZE) return c.json({ error: "文件超过 5MB 限制" }, 400);
-	const dot = name.lastIndexOf(".");
-	const mime = ALLOWED_EXT[name.slice(dot).toLowerCase()] ?? "image/jpeg";
+	const dot = file.name.lastIndexOf(".");
+	const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ".jpg";
+	const mime = ALLOWED_EXT[ext];
+	if (!mime) return c.json({ error: "只支持 jpg/png/gif/webp" }, 400);
 	const sniffed = await sniffImage(file);
 	if (!sniffed) return c.json({ error: "文件内容不是有效图片" }, 400);
-	// 新头图一律写到本站前缀，老站的固定文件名不再覆盖
-	await c.env.IMAGES.put(`cn-banner/${site.code}/${name}`, file.stream(), {
-		httpMetadata: { contentType: mime },
-	});
+
+	const key = `cn-banner/${site.code}/${page}${ext}`;
+	await c.env.IMAGES.put(key, file.stream(), { httpMetadata: { contentType: sniffed } });
+
+	const now = nowSql();
+	const exists = await c.env.DB.prepare('SELECT "id" FROM t_banner WHERE "SiteId" = ? AND "Page" = ?')
+		.bind(siteId, page)
+		.first();
+	if (exists) {
+		await c.env.DB.prepare(
+			'UPDATE t_banner SET "Pic" = ?, "NoteTime" = ? WHERE "SiteId" = ? AND "Page" = ?',
+		)
+			.bind(key, now, siteId, page)
+			.run();
+	} else {
+		await c.env.DB.prepare(
+			'INSERT INTO t_banner ("SiteId","Page","Title","Pic","OrderBy","IsShow","NoteTime") VALUES (?,?,?,?,0,1,?)',
+		)
+			.bind(siteId, page, "", key, now)
+			.run();
+	}
+	return c.json({ ok: true, pic: key });
+});
+
+// 清除某页头图：前台退回主题渐变底（不删 R2 对象，避免误删别处引用）
+app.delete("/banners/:page", async (c) => {
+	const siteId = c.get("siteId");
+	const page = c.req.param("page");
+	if (!BANNER_PAGES.some((b) => b.page === page)) return c.json({ error: "未知头图页面" }, 400);
+	const now = nowSql();
+	const exists = await c.env.DB.prepare('SELECT "id" FROM t_banner WHERE "SiteId" = ? AND "Page" = ?')
+		.bind(siteId, page)
+		.first();
+	if (exists) {
+		await c.env.DB.prepare(
+			'UPDATE t_banner SET "Pic" = \'\', "NoteTime" = ? WHERE "SiteId" = ? AND "Page" = ?',
+		)
+			.bind(now, siteId, page)
+			.run();
+	}
 	return c.json({ ok: true });
 });
 

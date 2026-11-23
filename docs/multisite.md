@@ -19,6 +19,7 @@
 | `t_sites` | 站点（租户）主表 | `Code` 唯一，`Theme` 存 JSON 主题色，`IsActive=0` 即整站 503 |
 | `t_site_domain` | 域名 → 站点 | `Host` 唯一（小写、去 `www.`、去端口），一个站点可绑多个域名 |
 | `t_throttle` | 登录限流计数 | 跨节点生效，替代原先的 isolate 内存计数 |
+| `t_banner` | 内页头图 | 每站每个页面一行（`SiteId` + `Page` 唯一），`Pic` 为 R2 键；`Pic` 为空表示该页不配图，前台用主题渐变底 |
 | `t_news` / `t_products` / `t_protype` / `t_img` / `t_content` / `t_global` / `t_feedback` / `t_log` | 业务表 | 每行带 `SiteId`；存量数据全部归 `SiteId=1`（bjrobust） |
 | `t_newtype` | 新闻/案例类型字典 | 保持全局，不按站点分（前台过滤仍带 SiteId） |
 | `t_admin` | 管理员 | `SiteId=0` 为平台超管（可跨站）；`>0` 为站点管理员（只能管本站） |
@@ -26,6 +27,11 @@
 其它约定：
 
 - 图片按站点分前缀：`upload/<code>/...`、`cn-banner/<code>/`。老图仍在 `upload/`、`cn-banner/` 根下，只有 `bjrobust` 会回退到这些旧路径，新站点不会串图。
+- 内页头图（公司概况/产品中心/新闻资讯/成功案例/技术支持/联系我们）是**按站点逐页配置**的：`t_banner` 里 `SiteId + Page` 唯一，图片键写在 `Pic`。
+  - 后台「站点设置 → 内页头图」可以逐页上传替换，也可以「清除」让该页退回主题色渐变；
+  - 上传的新图落到 `cn-banner/<code>/<page>.<ext>`，不会覆盖别站、也不会覆盖 bjrobust 的历史文件名；
+  - 新建站点默认没有头图记录，前台显示主题渐变，等你在后台逐页上传即可；
+  - bjrobust 迁移时已经把老的 `cn-banner/banner1..6.jpg` 写进表里，视觉与改造前一致。
 - 站点标识 `Code` 只允许小写字母/数字/短横线，创建后不可改（它是 R2 的路径前缀）。
 
 ## 2. 请求怎么落到站点

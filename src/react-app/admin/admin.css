@@ -569,12 +569,22 @@
 	display: block;
 	background: #f2f5f9;
 }
+.banner-slot-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 110px;
+	background: repeating-linear-gradient(45deg, #f7f9fc, #f7f9fc 10px, #f2f5f9 10px, #f2f5f9 20px);
+	color: #94a3b8;
+	font-size: 13px;
+}
 .banner-slot-meta {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	padding: 8px 10px;
 	font-size: 13px;
+	gap: 8px;
 }
 @media (max-width: 900px) {
 	.banner-grid {

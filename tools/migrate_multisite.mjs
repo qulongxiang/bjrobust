@@ -89,6 +89,28 @@ const DDL = [
 	"Count" INTEGER NOT NULL,
 	"WindowStart" TEXT NOT NULL
 )`,
+	// 内页头图：每站每个页面一行（Pic 为空 = 该页不配图，前台用主题渐变底）
+	`CREATE TABLE IF NOT EXISTS "t_banner" (
+	"id" INTEGER NOT NULL PRIMARY KEY,
+	"SiteId" INTEGER NOT NULL,
+	"Page" TEXT NOT NULL,
+	"Title" TEXT NOT NULL,
+	"Pic" TEXT NOT NULL,
+	"OrderBy" INTEGER NOT NULL,
+	"IsShow" INTEGER NOT NULL,
+	"NoteTime" TEXT NOT NULL
+)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS "ux_t_banner_site_page" ON "t_banner" ("SiteId", "Page")`,
+];
+
+// bjrobust 存量内页头图（R2 里的老文件），迁移时写成数据库初始值
+const BANNER_SEED = [
+	["about", "公司概况", "cn-banner/banner1.jpg"],
+	["products", "产品中心", "cn-banner/banner2.jpg"],
+	["news", "新闻资讯", "cn-banner/banner3.jpg"],
+	["cases", "成功案例", "cn-banner/banner4.jpg"],
+	["support", "技术支持", "cn-banner/banner5.jpg"],
+	["contact", "联系我们", "cn-banner/banner6.jpg"],
 ];
 
 function nowSql() {
@@ -272,6 +294,23 @@ async function run(a) {
 		if (g) continue;
 		await scaffold(a, siteId, s);
 		console.log(`  · ${s.code} 空白模板已生成`);
+	}
+
+	// 6) bjrobust 存量内页头图写入 t_banner（其它站点留空 → 前台主题渐变底，后台自行上传）
+	const bj = (await a.all(`SELECT id FROM t_sites WHERE "Code" = ?`, ["bjrobust"]))[0];
+	if (bj) {
+		const bjId = Number(bj.id);
+		let seeded = 0;
+		for (const [i, [page, title, pic]] of BANNER_SEED.entries()) {
+			const has = (await a.all(`SELECT id FROM t_banner WHERE "SiteId" = ? AND "Page" = ?`, [bjId, page]))[0];
+			if (has) continue;
+			await a.exec(
+				`INSERT INTO t_banner ("SiteId","Page","Title","Pic","OrderBy","IsShow","NoteTime") VALUES (?,?,?,?,?,1,?)`,
+				[bjId, page, title, pic, i, ts],
+			);
+			seeded++;
+		}
+		if (seeded) console.log(`  · bjrobust 内页头图初始记录 ${seeded} 条`);
 	}
 
 	console.log("多站点迁移完成");
