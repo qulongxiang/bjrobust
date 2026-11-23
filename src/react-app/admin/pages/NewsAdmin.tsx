@@ -1,5 +1,6 @@
 // 新闻/案例管理（t_news）：分类 tabs + 列表 + 新增/编辑弹框 + 删除
 import { useCallback, useEffect, useState } from "react";
+import ImageField from "../components/ImageField";
 import { adminApi, type AdminNews } from "../api";
 
 type NewsTypeOpt = { id: number; name: string };
@@ -263,14 +264,11 @@ export default function NewsAdmin() {
 								</select>
 							</div>
 						</div>
-						<div className="admin-field">
-							<label>缩略图（/assets 路径，如 /upload/xx.jpg）</label>
-							<input
-								value={editing.smallPic}
-								onChange={(e) => setEditing({ ...editing, smallPic: e.target.value })}
-								placeholder="/upload/xxx.jpg"
-							/>
-						</div>
+						<ImageField
+							label="缩略图（新闻列表 / 案例封面）"
+							value={editing.smallPic}
+							onChange={(p) => setEditing({ ...editing, smallPic: p })}
+						/>
 						<div className="admin-row">
 							<div className="admin-field">
 								<label>SEO 标题</label>

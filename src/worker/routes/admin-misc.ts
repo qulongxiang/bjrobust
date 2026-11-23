@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import type { AppEnv, AdminVariables } from "../env";
 import { isSuper, nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
+import { createSlide, deleteSlide, readSlides, updateSlide } from "../lib/slide";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -180,6 +181,36 @@ app.put("/site-meta", async (c) => {
 	return c.json({ ok: true });
 });
 
+// ---- 首页 banner 轮播（t_slide，当前站点） ----
+app.get("/slides", async (c) => c.json({ ok: true, items: await readSlides(c.env, c.get("siteId")) }));
+
+app.post("/slides", async (c) => {
+	const b = await c.req.json().catch(() => null);
+	if (!b) return c.json({ error: "请求格式错误" }, 400);
+	if (!String(b.pic ?? "").trim()) return c.json({ error: "请先上传轮播图片" }, 400);
+	const id = await createSlide(c.env, c.get("siteId"), {
+		pic: String(b.pic).trim(),
+		title: String(b.title ?? ""),
+		link: String(b.link ?? ""),
+		order: Number(b.order ?? 0) || 0,
+	});
+	return c.json({ ok: true, id });
+});
+
+app.put("/slides/:id", async (c) => {
+	const b = await c.req.json().catch(() => null);
+	if (!b) return c.json({ error: "请求格式错误" }, 400);
+	const ok = await updateSlide(c.env, c.get("siteId"), Number(c.req.param("id")), b);
+	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	return c.json({ ok: true });
+});
+
+app.delete("/slides/:id", async (c) => {
+	const ok = await deleteSlide(c.env, c.get("siteId"), Number(c.req.param("id")));
+	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	return c.json({ ok: true });
+});
+
 // ---- 管理员账户（t_admin） ----
 // 超管看到所有账号（含平台级 SiteId=0）；站点管理员只看到本站账号
 app.get("/users", async (c) => {
@@ -211,7 +242,7 @@ app.get("/users", async (c) => {
 app.post("/users", async (c) => {
 	const db = c.env.DB;
 	const me = c.get("admin");
-	if (!isSuper(me)) return c.json({ error: "只有超级管理员可以添加管理员" }, 403);
+	const superAdmin = isSuper(me);
 	const b = await c.req.json().catch(() => null);
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
 	const username = String(b.username ?? "").trim().slice(0, 50);
@@ -219,7 +250,17 @@ app.post("/users", async (c) => {
 	const called = String(b.called ?? "").trim().slice(0, 50) || username;
 	if (!username) return c.json({ error: "用户名不能为空" }, 400);
 	if (password.length < 6) return c.json({ error: "密码至少 6 位" }, 400);
-	const targetSiteId = "siteId" in b ? Number(b.siteId ?? 0) : c.get("siteId");
+	// 站点管理员只能给自己站点加账号；平台级账号（SiteId=0）只有超管能建
+	let targetSiteId: number;
+	if (superAdmin) {
+		targetSiteId = "siteId" in b ? Number(b.siteId ?? 0) || 0 : 0;
+	} else {
+		targetSiteId = c.get("siteId");
+		// 只有显式传 siteId=0（想建平台级账号）才拒绝；不传 = 建本站账号
+		if ("siteId" in b && Number(b.siteId ?? 0) === 0) {
+			return c.json({ error: "站点管理员不能创建平台级账号" }, 403);
+		}
+	}
 	if (targetSiteId > 0) {
 		const site = await db.prepare('SELECT id FROM t_sites WHERE "id" = ?').bind(targetSiteId).first();
 		if (!site) return c.json({ error: "目标站点不存在" }, 400);
@@ -240,8 +281,9 @@ app.post("/users", async (c) => {
 		hash,
 		0,
 		called,
-		me.UserRole,
-		me.UserRoleCalled,
+		// 角色串不要从建号人身上继承（超管的 "admin" 会让新人被误判为超管）；站点归属由 SiteId 决定
+		targetSiteId === 0 ? "0" : "1",
+		targetSiteId === 0 ? "平台超管" : "站点管理员",
 		0,
 		0,
 		0,
@@ -333,11 +375,13 @@ app.put("/users/:id/password", async (c) => {
 	const superAdmin = isSuper(me);
 	const target = await db.prepare('SELECT id, "SiteId" FROM t_admin WHERE id = ?').bind(id).first();
 	if (!target) return c.json({ error: "记录不存在" }, 404);
-	// 非超管只能改本站账号；超管可在自己站点内改任意（跨站修改请切换站点后再操作，避免误伤）
+	// 权限：本人可改自己；本站账号任何人可改；平台级账号（SiteId=0）与跨站账号只有超管切到对应站点后才能改
 	if (id !== me.id) {
-		if (!superAdmin) return c.json({ error: "只有超级管理员可以重置其他账户密码" }, 403);
 		const targetSite = Number(target.SiteId ?? 0);
-		if (targetSite !== 0 && targetSite !== c.get("siteId")) return c.json({ error: "该账号属于其他站点，请先切换到对应站点" }, 403);
+		if (targetSite === 0 && !superAdmin) return c.json({ error: "不能修改平台级账号" }, 403);
+		if (targetSite !== 0 && targetSite !== c.get("siteId")) {
+			return c.json({ error: "该账号属于其他站点，请先切换到对应站点" }, 403);
+		}
 	}
 	const b = await c.req.json().catch(() => null);
 	const password = String(b?.password ?? "");
@@ -353,11 +397,12 @@ app.put("/users/:id/lock", async (c) => {
 	const db = c.env.DB;
 	const id = Number(c.req.param("id"));
 	const me = c.get("admin");
+	const superAdmin = isSuper(me);
 	if (id === me.id) return c.json({ error: "不能锁定自己" }, 400);
-	if (!isSuper(me)) return c.json({ error: "只有超级管理员可以操作" }, 403);
 	const target = await db.prepare('SELECT id, "SiteId" FROM t_admin WHERE id = ?').bind(id).first();
 	if (!target) return c.json({ error: "记录不存在" }, 404);
 	const targetSite = Number(target.SiteId ?? 0);
+	if (targetSite === 0 && !superAdmin) return c.json({ error: "不能操作平台级账号" }, 403);
 	if (targetSite !== 0 && targetSite !== c.get("siteId")) {
 		return c.json({ error: "该账号属于其他站点，请先切换到对应站点" }, 403);
 	}

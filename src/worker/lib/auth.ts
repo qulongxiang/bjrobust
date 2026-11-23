@@ -78,7 +78,9 @@ export function clearSessionCookie(secure: boolean): string {
 
 /** 超管判定：权限码为 0、角色名为 admin，或 SiteId=0（平台级账号） */
 export function isSuper(a: { UserRole: string; UserRoleCalled: string; siteId: number }): boolean {
-	return a.UserRole === "0" || a.UserRoleCalled === "admin" || a.siteId === 0;
+	// 唯一判据是账号归属：SiteId=0 才是平台超管；>0 一律是站点管理员。
+	// 不再看 UserRole/UserRoleCalled——早期从原型继承的 "admin" 角色串会让人误判成超管。
+	return a.siteId === 0;
 }
 
 // ---- 登录验证（t_admin，UserType=2 为管理员；密码为 bcrypt 哈希） ----

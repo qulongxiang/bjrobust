@@ -1,6 +1,8 @@
 // 站点设置（t_global）+ 静态页（t_content）+ 品牌主题（t_sites）+ 内页头图（t_banner，每页一张）
 import { useEffect, useState } from "react";
-import { adminApi, type ContentPage, type GlobalSettings, type SiteMetaInfo } from "../api";
+import ImageField from "../components/ImageField";
+import SlideEditor from "../components/SlideEditor";
+import { adminApi, type ContentPage, type GlobalSettings, type SiteMetaInfo, type SlideItem } from "../api";
 
 type BannerItem = { page: string; label: string; pic: string; url: string; updated: string };
 
@@ -11,6 +13,8 @@ export default function SiteAdmin() {
 	const [editing, setEditing] = useState<ContentPage | null>(null);
 	const [banners, setBanners] = useState<BannerItem[]>([]);
 	const [bannerBusy, setBannerBusy] = useState<string | null>(null);
+	const [slides, setSlides] = useState<SlideItem[]>([]);
+	const [slideBusy, setSlideBusy] = useState("");
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 	const [busy, setBusy] = useState(false);
 
@@ -20,6 +24,7 @@ export default function SiteAdmin() {
 	};
 
 	const loadBanners = () => adminApi.bannerList().then((d) => setBanners(d.items)).catch(() => {});
+	const loadSlides = () => adminApi.slides().then((d) => setSlides(d.items)).catch(() => {});
 
 	useEffect(() => {
 		adminApi
@@ -31,12 +36,53 @@ export default function SiteAdmin() {
 			.then((d) => setPages(d.items))
 			.catch(() => {});
 		loadBanners();
+		loadSlides();
 		adminApi
 			.siteMeta()
 			.then((d) => setMeta(d.meta))
 			.catch(() => {});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// ---- 首页轮播 ----
+	const addSlide = async (file?: File | null) => {
+		if (!file) return;
+		setSlideBusy("slide:add");
+		try {
+			const up = await adminApi.uploadFiles(file);
+			await adminApi.addSlide({ pic: up.path, title: "", order: 0 });
+			flash(true, "已添加一张首页轮播");
+			await loadSlides();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "添加失败");
+		} finally {
+			setSlideBusy("");
+		}
+	};
+	const patchSlide = async (id: number, b: { order?: number; isShow?: number; title?: string; link?: string }) => {
+		setSlideBusy(`slide:${id}`);
+		try {
+			await adminApi.updateSlide(id, b);
+			await loadSlides();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "保存失败");
+		} finally {
+			setSlideBusy("");
+		}
+	};
+	const delSlide = async (id: number) => {
+		if (!confirm("删除这张轮播？（前台立即不再显示，图片文件保留）")) return;
+		setSlideBusy(`slide:${id}`);
+		try {
+			await adminApi.delSlide(id);
+			flash(true, "轮播已删除");
+			await loadSlides();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "删除失败");
+		} finally {
+			setSlideBusy("");
+		}
+	};
 
 	const saveGlobal = async () => {
 		if (!global) return;
@@ -101,7 +147,7 @@ export default function SiteAdmin() {
 	};
 
 	const onBannerClear = async (b: BannerItem) => {
-		if (!confirm(`清除「${b.label}」的头图？（前台会退回主题色渐变底，图片文件保留）`)) return;
+		if (!confirm(`清除「${b.label}」的头图？（前台该页将不再显示 banner，图片文件保留）`)) return;
 		setBannerBusy(b.page);
 		try {
 			await adminApi.clearBanner(b.page);
@@ -148,11 +194,14 @@ export default function SiteAdmin() {
 							<label>服务邮箱</label>
 							<input value={meta.email} onChange={(e) => setMeta({ ...meta, email: e.target.value })} />
 						</div>
-						<div className="admin-field">
-							<label>Logo 地址（/assets/... 或 https://）</label>
-							<input value={meta.logoUrl} onChange={(e) => setMeta({ ...meta, logoUrl: e.target.value })} />
-						</div>
 					</div>
+					<ImageField
+						label="站点 Logo"
+						value={meta.logoUrl}
+						onChange={(p) => setMeta({ ...meta, logoUrl: p })}
+						ratio="4 / 1"
+						hint="建议透明底 PNG，宽度 ≥ 400，高度 100 左右"
+					/>
 					<div className="admin-row">
 						<div className="admin-field">
 							<label>主色</label>
@@ -241,9 +290,17 @@ export default function SiteAdmin() {
 			</div>
 
 			<div className="admin-panel">
+				<h3 style={{ marginTop: 0 }}>首页 banner 轮播（可多张，各站点独立）</h3>
+				<p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+					前台首页顶部自动轮播，6 秒一张。建议宽度 1920、高 400–600，≤5MB。没有轮播图时首页不显示轮播区域。
+				</p>
+				<SlideEditor items={slides} busy={slideBusy} onAdd={addSlide} onPatch={patchSlide} onDelete={delSlide} />
+			</div>
+
+			<div className="admin-panel">
 				<h3 style={{ marginTop: 0 }}>内页头图（每页一张，存数据库，各站点独立）</h3>
 				<p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-					建议尺寸 1200–1920 宽、高 300–450，≤5MB（jpg/png/webp）。这里改的是<b>当前站点</b>的头图，其它站点互不影响；清除后前台退回主题色渐变底。
+					建议尺寸 1200–1920 宽、高 300–450，≤5MB（jpg/png/webp）。这里改的是<b>当前站点</b>的头图，其它站点互不影响；<b>清除后前台该页不再显示 banner</b>。
 				</p>
 				<div className="banner-grid">
 					{banners.map((b) => (
@@ -251,7 +308,7 @@ export default function SiteAdmin() {
 							{b.url ? (
 								<img src={b.updated ? `${b.url}?v=${encodeURIComponent(b.updated)}` : b.url} alt={b.label} />
 							) : (
-								<div className="banner-slot-empty">未配置（前台显示主题渐变）</div>
+								<div className="banner-slot-empty">未配置（前台不显示）</div>
 							)}
 							<div className="banner-slot-meta">
 								<span>{b.label}</span>

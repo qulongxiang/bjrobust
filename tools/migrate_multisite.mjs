@@ -101,6 +101,18 @@ const DDL = [
 	"NoteTime" TEXT NOT NULL
 )`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS "ux_t_banner_site_page" ON "t_banner" ("SiteId", "Page")`,
+	// 首页 banner 轮播：每站可多张，靠 OrderBy 排序（Pic 为空的行不显示）
+	`CREATE TABLE IF NOT EXISTS "t_slide" (
+	"id" INTEGER NOT NULL PRIMARY KEY,
+	"SiteId" INTEGER NOT NULL,
+	"Pic" TEXT NOT NULL,
+	"Title" TEXT NOT NULL,
+	"Link" TEXT NOT NULL,
+	"OrderBy" INTEGER NOT NULL,
+	"IsShow" INTEGER NOT NULL,
+	"NoteTime" TEXT NOT NULL
+)`,
+	`CREATE INDEX IF NOT EXISTS "idx_t_slide_SiteId" ON "t_slide" ("SiteId")`,
 ];
 
 // bjrobust 存量内页头图（R2 里的老文件），迁移时写成数据库初始值
@@ -311,6 +323,28 @@ async function run(a) {
 			seeded++;
 		}
 		if (seeded) console.log(`  · bjrobust 内页头图初始记录 ${seeded} 条`);
+	}
+
+	// 7) 首页轮播：把老站 t_news(NewType=1) 里的 banner 搬到 t_slide（每站只搬一次）
+	for (const s of SITES) {
+		const row = (await a.all(`SELECT id FROM t_sites WHERE "Code" = ?`, [s.code]))[0];
+		if (!row) continue;
+		const siteId = Number(row.id);
+		const has = (await a.all(`SELECT id FROM t_slide WHERE "SiteId" = ? LIMIT 1`, [siteId])).length;
+		if (has) continue;
+		const old = await a.all(
+			`SELECT id, Title, SmallPic, OrderBy, NoteTime, LINK FROM t_news WHERE "SiteId" = ? AND NewType = 1 AND SmallPic <> '' ORDER BY OrderBy DESC, id DESC`,
+			[siteId],
+		);
+		let seeded = 0;
+		for (const [i, r] of old.entries()) {
+			await a.exec(
+				`INSERT INTO t_slide ("SiteId","Pic","Title","Link","OrderBy","IsShow","NoteTime") VALUES (?,?,?,?,?,1,?)`,
+				[siteId, String(r.SmallPic ?? ""), String(r.Title ?? ""), String(r.LINK ?? ""), old.length - i, String(r.NoteTime ?? ts)],
+			);
+			seeded++;
+		}
+		if (seeded) console.log(`  · ${s.code} 首页轮播从 t_news 迁移 ${seeded} 张`);
 	}
 
 	console.log("多站点迁移完成");

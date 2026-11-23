@@ -5,6 +5,7 @@ import { isSuper, nowSql } from "../lib/auth";
 import { BANNER_PAGES, isBannerPage, readBannerEntries, saveBannerFile, setBannerPic } from "../lib/banner";
 import { count, exec, rows } from "../lib/d1";
 import { hasContent, scaffoldSite } from "../lib/scaffold";
+import { createSlide, deleteSlide, readSlides, updateSlide } from "../lib/slide";
 import { normalizeHost, siteByCode } from "../lib/tenant";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
@@ -249,7 +250,7 @@ app.delete("/platform/sites/:id", async (c) => {
 	if (has && c.req.query("force") !== "1") {
 		return c.json({ error: "该站点已有内容，确认删除请带 force=1" }, 400);
 	}
-	for (const t of ["t_news", "t_products", "t_protype", "t_img", "t_content", "t_global", "t_feedback", "t_log", "t_banner"]) {
+	for (const t of ["t_news", "t_products", "t_protype", "t_img", "t_content", "t_global", "t_feedback", "t_log", "t_banner", "t_slide"]) {
 		await exec(env.DB.prepare(`DELETE FROM ${t} WHERE "SiteId" = ?`), id);
 	}
 	await exec(env.DB.prepare('DELETE FROM t_site_domain WHERE "SiteId" = ?'), id);
@@ -257,27 +258,43 @@ app.delete("/platform/sites/:id", async (c) => {
 	return c.json({ ok: true });
 });
 
-// ---- 跨站点头图矩阵：一次看全所有站点 × 所有页面 ----
+// ---- 跨站素材概览：一次返回所有站点的头图/轮播覆盖情况（40+ 站点也只发一个请求） ----
 app.get("/platform/banners", async (c) => {
 	if (!isSuper(c.get("admin"))) return deny(c);
 	const env = c.env;
 	const sites = await rows(env.DB.prepare('SELECT "id", "Code", "Name", "IsActive" FROM t_sites ORDER BY "Sort", "id"'));
-	const matrix: Record<string, Record<string, { pic: string; url: string; updated: string }>> = {};
-	for (const s of sites) {
-		const code = String(s.Code ?? "");
-		const entries = await readBannerEntries(env, Number(s.id));
-		matrix[code] = Object.fromEntries(entries.map((e) => [e.page, { pic: e.pic, url: e.url, updated: e.updated }]));
-	}
+	const bannerCounts = await rows(
+		env.DB.prepare('SELECT "SiteId", COUNT(*) AS n FROM t_banner WHERE "Pic" <> \'\' GROUP BY "SiteId"'),
+	);
+	const slideCounts = await rows(
+		env.DB.prepare('SELECT "SiteId", COUNT(*) AS n FROM t_slide WHERE "IsShow" = 1 AND "Pic" <> \'\' GROUP BY "SiteId"'),
+	);
+	const bc = new Map(bannerCounts.map((r) => [Number(r.SiteId), Number(r.n)]));
+	const sc = new Map(slideCounts.map((r) => [Number(r.SiteId), Number(r.n)]));
 	return c.json({
 		ok: true,
 		pages: BANNER_PAGES,
-		sites: sites.map((s) => ({
-			code: String(s.Code ?? ""),
-			name: String(s.Name ?? ""),
-			isActive: Number(s.IsActive ?? 0),
-		})),
-		matrix,
+		sites: sites.map((s) => {
+			const id = Number(s.id);
+			return {
+				id,
+				code: String(s.Code ?? ""),
+				name: String(s.Name ?? ""),
+				isActive: Number(s.IsActive ?? 0),
+				bannerCount: bc.get(id) ?? 0,
+				bannerTotal: BANNER_PAGES.length,
+				slideCount: sc.get(id) ?? 0,
+			};
+		}),
 	});
+});
+
+// 单站头图明细（平台素材维护面板用）
+app.get("/platform/banners/:code", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const site = await siteByCode(c.env, c.req.param("code").toLowerCase());
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	return c.json({ ok: true, code: site.code, pages: BANNER_PAGES, items: await readBannerEntries(c.env, site.id) });
 });
 
 app.put("/platform/banners/:code/:page", async (c) => {
@@ -305,6 +322,50 @@ app.delete("/platform/banners/:code/:page", async (c) => {
 	if (!site) return c.json({ error: "站点不存在" }, 404);
 	await setBannerPic(c.env, site.id, page, "");
 	return c.json({ ok: true, code, page });
+});
+
+// ---- 跨站首页轮播（t_slide）：/platform/slides/:code ----
+app.get("/platform/slides/:code", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const site = await siteByCode(c.env, c.req.param("code").toLowerCase());
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	return c.json({ ok: true, items: await readSlides(c.env, site.id) });
+});
+
+app.post("/platform/slides/:code", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const site = await siteByCode(c.env, c.req.param("code").toLowerCase());
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	const b = await c.req.json().catch(() => null);
+	if (!b) return c.json({ error: "请求格式错误" }, 400);
+	if (!String(b.pic ?? "").trim()) return c.json({ error: "请先上传轮播图片" }, 400);
+	const id = await createSlide(c.env, site.id, {
+		pic: String(b.pic).trim(),
+		title: String(b.title ?? ""),
+		link: String(b.link ?? ""),
+		order: Number(b.order ?? 0) || 0,
+	});
+	return c.json({ ok: true, id });
+});
+
+app.put("/platform/slides/:code/:id", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const site = await siteByCode(c.env, c.req.param("code").toLowerCase());
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	const b = await c.req.json().catch(() => null);
+	if (!b) return c.json({ error: "请求格式错误" }, 400);
+	const ok = await updateSlide(c.env, site.id, Number(c.req.param("id")), b);
+	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	return c.json({ ok: true });
+});
+
+app.delete("/platform/slides/:code/:id", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const site = await siteByCode(c.env, c.req.param("code").toLowerCase());
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	const ok = await deleteSlide(c.env, site.id, Number(c.req.param("id")));
+	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	return c.json({ ok: true });
 });
 
 export default app;

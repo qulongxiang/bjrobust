@@ -1,6 +1,7 @@
 // 产品管理（t_products + t_protype + t_img）：分类筛选 + 列表 + 编辑弹框 + 图集弹框
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ImageField from "../components/ImageField";
 import { adminApi, type AdminProduct, type ProType } from "../api";
 
 export default function ProductAdmin() {
@@ -289,14 +290,11 @@ export default function ProductAdmin() {
 								</select>
 							</div>
 						</div>
-						<div className="admin-field">
-							<label>缩略图（/assets 路径）</label>
-							<input
-								value={editing.smallPic}
-								onChange={(e) => setEditing({ ...editing, smallPic: e.target.value })}
-								placeholder="/upload/xxx.jpg"
-							/>
-						</div>
+						<ImageField
+							label="缩略图"
+							value={editing.smallPic}
+							onChange={(p) => setEditing({ ...editing, smallPic: p })}
+						/>
 						<div className="admin-row">
 							<div className="admin-field">
 								<label>编号（BH）</label>

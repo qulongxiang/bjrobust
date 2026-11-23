@@ -60,7 +60,12 @@ export default function AdminApp() {
 	if (checking) return <div className="admin-loading">加载中…</div>;
 	if (!me) return <Navigate to="/admin/login" replace />;
 
-	const ctx: AdminCtx = { user: me.user, onLogout };
+	const ctx: AdminCtx = {
+		user: me.user,
+		onLogout,
+		sites: me.user.isSuper ? me.sites : [],
+		siteCode: me.site?.code ?? "",
+	};
 	return (
 		<AdminLayout
 			user={me.user}

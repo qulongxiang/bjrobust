@@ -50,3 +50,20 @@ CREATE INDEX IF NOT EXISTS "idx_t_site_domain_SiteId" ON "t_site_domain" ("SiteI
 
 -- 说明：t_newtype（新闻分类）是结构性字典，保持全局唯一，不按站点拆分；
 --       t_dict / t_config / t_plugin 等旧站残留表本次不动。
+
+-- ============ 5. 首页 banner 轮播 ============
+-- 原来首页轮播挂在 t_news NewType=1 上，后台改不了；现独立成表，按站点分组。
+CREATE TABLE IF NOT EXISTS "t_slide" (
+  "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "SiteId" INTEGER NOT NULL DEFAULT 1,
+  "Pic" TEXT NOT NULL DEFAULT '',
+  "Title" TEXT NOT NULL DEFAULT '',
+  "Link" TEXT NOT NULL DEFAULT '',
+  "OrderBy" INTEGER NOT NULL DEFAULT 0,
+  "IsShow" INTEGER NOT NULL DEFAULT 1,
+  "NoteTime" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "idx_t_slide_SiteId" ON "t_slide" ("SiteId");
+
+-- 说明：Pic 存 R2 键（upload/<code>/x.jpg 或老站裸文件名 2019040911344838.jpg），
+--      前台 /api/site/home 先读 t_slide，空则回退 t_news NewType=1 的老逻辑。

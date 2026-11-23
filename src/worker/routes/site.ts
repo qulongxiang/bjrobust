@@ -8,6 +8,7 @@ import { Hono } from "hono";
 import type { AppEnv, AdminVariables, SiteInfo } from "../env";
 import { nowSql } from "../lib/auth";
 import { exec, rows } from "../lib/d1";
+import { publicSlides } from "../lib/slide";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -116,11 +117,23 @@ app.get("/home", async (c) => {
 		.prepare("SELECT Content FROM t_content WHERE SiteId = ? AND Language = ? AND Called = ? LIMIT 1")
 		.bind(siteId, CN, "首页公司简介")
 		.first();
-	const bannerRows = await rows(
-		db.prepare(
-			"SELECT id, Title, SmallPic, NoteTime, OrderBy FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 1 ORDER BY OrderBy DESC, id DESC LIMIT 10",
-		).bind(siteId),
-	);
+	// 首页轮播：优先 t_slide（后台「首页轮播」维护）；没有记录时回退到老站点 t_news(NewType=1)
+	let banners = await publicSlides(c.env, siteId);
+	if (!banners.length) {
+		const bannerRows = await rows(
+			db
+				.prepare(
+					"SELECT id, Title, SmallPic AS pic, NoteTime AS noteTime FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 1 AND SmallPic <> '' ORDER BY OrderBy DESC, id DESC LIMIT 10",
+				)
+				.bind(siteId),
+		);
+		banners = bannerRows.map((r) => ({
+			id: Number(r.id),
+			title: String(r.Title ?? ""),
+			pic: String(r.pic ?? ""),
+			noteTime: String(r.noteTime ?? ""),
+		}));
+	}
 	const newsRows = await rows(
 		db.prepare(
 			"SELECT id, Title, NoteTime, SmallPic, OrderBy, Hits, WebTitle FROM t_news WHERE SiteId = ? AND IsShow = 1 AND NewType = 3 ORDER BY OrderBy DESC, id DESC LIMIT 8",
@@ -153,12 +166,7 @@ app.get("/home", async (c) => {
 				}
 			: null,
 		about: String(aboutRow?.Content ?? ""),
-		banners: bannerRows.map((r) => ({
-			id: Number(r.id),
-			title: String(r.Title ?? ""),
-			pic: String(r.SmallPic ?? ""),
-			noteTime: String(r.NoteTime ?? ""),
-		})),
+		banners,
 		news: newsRows.map((r) => ({
 			id: Number(r.id),
 			title: String(r.Title ?? ""),

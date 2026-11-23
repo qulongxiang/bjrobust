@@ -592,50 +592,221 @@
 	}
 }
 
-/* 跨站头图矩阵：每格一个小缩略图 + 上传/清除 */
-.banner-matrix {
-	margin-top: 12px;
-	overflow-x: auto;
+/* ===== 平台管理：站点卡片网格（几十个域名也不挤） ===== */
+.site-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
 }
-.banner-matrix th {
-	white-space: nowrap;
+.site-toolbar input {
+	flex: 1 1 240px;
+	max-width: 320px;
+	padding: 7px 12px;
+	border: 1px solid #e0e5ee;
+	border-radius: 8px;
 }
-.banner-cell {
+.site-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 14px;
+}
+.site-card {
+	border: 1px solid #e5e9f0;
+	border-radius: 10px;
+	background: #fff;
+	padding: 14px 14px 12px;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	min-width: 130px;
+	gap: 8px;
+	box-shadow: 0 1px 2px rgba(15, 35, 70, 0.04);
 }
-.banner-thumb {
-	height: 60px;
+.site-card.off {
+	background: #fafbfd;
+	opacity: 0.85;
+}
+.site-card-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 8px;
+}
+.site-card-name {
+	font-weight: 700;
+	font-size: 15px;
+	color: #1f2d3d;
+}
+.site-card-code {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: #7b8794;
+	margin-top: 3px;
+}
+.site-card-code .tag {
+	margin: 0;
+}
+/* 通用标签（站点卡片用；表格内有更具体的 .platform-table td .tag 覆盖） */
+.tag {
+	display: inline-block;
+	padding: 1px 8px;
+	border-radius: 10px;
+	font-size: 12px;
+	line-height: 18px;
+	background: #eaf1f9;
+	color: #14508c;
+}
+.tag.off {
+	background: #f3f5f9;
+	color: #6b7280;
+}
+.site-card-domains {
+	font-size: 12px;
+	color: #5b6b7f;
+	line-height: 1.5;
+	word-break: break-all;
+	min-height: 18px;
+}
+.site-card-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	font-size: 12px;
+	color: #8a97a8;
+	padding-top: 6px;
+	border-top: 1px dashed #eef1f6;
+}
+.site-card-meta .warn {
+	color: #d97706;
+	font-weight: 600;
+}
+.site-card-ops {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.site-card-ops .btn.small {
+	padding: 4px 10px;
+}
+
+/* ===== 单站素材维护面板 ===== */
+.media-panel {
+	margin-top: 18px;
+}
+.media-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+}
+.media-sub {
+	margin: 16px 0 10px;
+	font-size: 14px;
+	color: #34495e;
+	font-weight: 600;
+}
+.slide-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.slide-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
 	border: 1px solid #e5e9f0;
+	border-radius: 8px;
+	padding: 8px;
+	background: #fff;
+	flex-wrap: wrap;
+}
+.slide-thumb {
+	width: 120px;
+	height: 56px;
 	border-radius: 6px;
 	overflow: hidden;
+	background: #f2f5f9;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: repeating-linear-gradient(45deg, #f7f9fc, #f7f9fc 8px, #f2f5f9 8px, #f2f5f9 16px);
 	font-size: 12px;
+	flex: 0 0 auto;
 }
-.banner-thumb img {
+.slide-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.slide-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1 1 260px;
+}
+.slide-fields input {
+	width: 100%;
+	padding: 6px 10px;
+	border: 1px solid #e0e5ee;
+	border-radius: 6px;
+	font-size: 13px;
+}
+.slide-ops {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.slide-ops input {
+	padding: 6px 8px;
+	border: 1px solid #e0e5ee;
+	border-radius: 6px;
+	font-size: 13px;
+}
+.slide-add {
+	align-self: flex-start;
+}
+
+/* ===== 图片字段（上传替代手填路径） ===== */
+.imgfield {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.imgfield-thumb {
+	width: 100%;
+	max-width: 260px;
+	border: 1px dashed #d6dde8;
+	border-radius: 8px;
+	background: repeating-linear-gradient(45deg, #fafbfd, #fafbfd 8px, #f4f6fa 8px, #f4f6fa 16px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	font-size: 12px;
+	color: #94a3b8;
+}
+.imgfield-thumb img {
 	width: 100%;
 	height: 100%;
 	object-fit: contain;
 	background: #fff;
 	display: block;
 }
-.banner-ops {
+.imgfield-ops {
 	display: flex;
 	gap: 6px;
+	flex-wrap: wrap;
 }
-.banner-ops .btn.small {
-	padding: 3px 10px;
+.imgfield-ops .btn.small {
+	padding: 4px 10px;
 }
-.banner-ops .btn.disabled {
+.imgfield-ops .btn.disabled {
 	opacity: 0.6;
 	pointer-events: none;
 }
-
 /* ===== 站点切换（超管）/ 当前站点标识 ===== */
 .admin-site-switch {
 	margin: 0 12px 12px;

@@ -1,6 +1,7 @@
 // 产品添加（对应旧后台"产品添加"独立页）：整页表单，保存后跳回产品列表
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ImageField from "../components/ImageField";
 import { adminApi, type AdminProduct, type ProType } from "../api";
 
 const EMPTY: AdminProduct = {
@@ -113,10 +114,12 @@ export default function ProductAdd() {
 						</select>
 					</div>
 				</div>
-				<div className="admin-field">
-					<label>缩略图（/assets 路径）</label>
-					<input value={form.smallPic} onChange={(e) => set("smallPic", e.target.value)} placeholder="/upload/xxx.jpg" />
-				</div>
+				<ImageField
+					label="产品缩略图"
+					value={form.smallPic}
+					onChange={(p) => set("smallPic", p)}
+					hint="建议 800×600 以内，jpg/png/webp，≤5MB"
+				/>
 				<div className="admin-row">
 					<div className="admin-field">
 						<label>SEO 标题</label>

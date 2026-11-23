@@ -1,11 +1,13 @@
-// 平台管理（仅超管）：站点（租户）列表、新建、编辑、域名绑定、空白模板初始化、启停、删除
+// 平台管理（仅超管）：站点卡片网格（支撑几十个域名）+ 单站素材维护（6 页头图 + 首页轮播）
 import { useEffect, useState } from "react";
-import { adminApi, type PlatformSite, type PlatformStats, type SiteTheme } from "../api";
+import ImageField from "../components/ImageField";
+import SlideEditor from "../components/SlideEditor";
+import { adminApi, type PlatformSite, type PlatformStats, type SiteTheme, type SlideItem } from "../api";
 
 const DEFAULT_THEME: SiteTheme = { primary: "#14508c", primaryDark: "#0e3c6e", accent: "#ff9f00" };
 
 type EditState = {
-	id: number | null; // null = 新建
+	id: number | null;
 	code: string;
 	name: string;
 	companyName: string;
@@ -16,6 +18,8 @@ type EditState = {
 	domains: string;
 	init: boolean;
 };
+
+type Coverage = { bannerCount: number; bannerTotal: number; slideCount: number };
 
 const emptyEdit = (): EditState => ({
 	id: null,
@@ -39,7 +43,7 @@ function toState(s: PlatformSite): EditState {
 		hotline: s.hotline,
 		email: s.email,
 		logoUrl: s.logoUrl,
-		theme: { ...DEFAULT_THEME, ...s.theme },
+		theme: s.theme ?? { ...DEFAULT_THEME },
 		domains: s.domains.join("\n"),
 		init: false,
 	};
@@ -48,9 +52,13 @@ function toState(s: PlatformSite): EditState {
 export default function PlatformAdmin() {
 	const [sites, setSites] = useState<PlatformSite[]>([]);
 	const [stats, setStats] = useState<Record<string, PlatformStats>>({});
+	const [coverage, setCoverage] = useState<Record<string, Coverage>>({});
 	const [defaultCode, setDefaultCode] = useState("bjrobust");
 	const [currentCode, setCurrentCode] = useState("");
 	const [editing, setEditing] = useState<EditState | null>(null);
+	const [mediaCode, setMediaCode] = useState("");
+	const [keyword, setKeyword] = useState("");
+	const [filter, setFilter] = useState<"all" | "active" | "off">("all");
 	const [busy, setBusy] = useState(false);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -59,16 +67,25 @@ export default function PlatformAdmin() {
 		setTimeout(() => setMsg(null), 3500);
 	};
 
-	const load = () =>
-		adminApi
-			.platformSites()
-			.then((d) => {
-				setSites(d.sites);
-				setStats(d.stats);
-				setDefaultCode(d.defaultCode);
-				setCurrentCode(d.currentCode);
-			})
-			.catch((e) => flash(false, e instanceof Error ? e.message : "加载失败"));
+	const load = async () => {
+		try {
+			const [d, cov] = await Promise.all([adminApi.platformSites(), adminApi.platformBanners()]);
+			setSites(d.sites);
+			setStats(d.stats);
+			setDefaultCode(d.defaultCode);
+			setCurrentCode(d.currentCode);
+			setCoverage(
+				Object.fromEntries(
+					cov.sites.map((s) => [
+						s.code,
+						{ bannerCount: s.bannerCount, bannerTotal: s.bannerTotal, slideCount: s.slideCount },
+					]),
+				),
+			);
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "加载失败");
+		}
+	};
 
 	useEffect(() => {
 		load();
@@ -141,100 +158,137 @@ export default function PlatformAdmin() {
 	const remove = async (s: PlatformSite) => {
 		const hasContent = stats[s.code]?.initialized;
 		const tip = hasContent
-			? `「${s.code}」已有内容，删除会连同新闻/产品/留言一起清空，且不可恢复。确认删除？`
+			? `「${s.code}」已有内容，删除会连同新闻/产品/留言/头图/轮播一起清空，且不可恢复。确认删除？`
 			: `确认删除站点「${s.code}」？`;
 		if (!confirm(tip)) return;
 		try {
 			await adminApi.deletePlatformSite(s.id, hasContent);
 			flash(true, "已删除");
+			if (mediaCode === s.code) setMediaCode("");
 			await load();
 		} catch (e) {
 			flash(false, e instanceof Error ? e.message : "删除失败");
 		}
 	};
 
+	const kw = keyword.trim().toLowerCase();
+	const shown = sites.filter((s) => {
+		if (filter === "active" && s.isActive !== 1) return false;
+		if (filter === "off" && s.isActive === 1) return false;
+		if (!kw) return true;
+		return (
+			s.code.toLowerCase().includes(kw) ||
+			s.name.toLowerCase().includes(kw) ||
+			s.companyName.toLowerCase().includes(kw) ||
+			s.domains.some((d) => d.toLowerCase().includes(kw))
+		);
+	});
+
+	const mediaSite = sites.find((s) => s.code === mediaCode);
+
 	return (
 		<div>
 			<div className="admin-page-head">
 				<h2>平台管理</h2>
-				<p className="muted" style={{ marginTop: 6 }}>
-					一套部署服务多个域名：每个域名按 Host 命中一个站点，前台展示对应公司的内容与配色。
-					当前生效站点：<b>{currentCode}</b>（默认站 {defaultCode} 为未知域名的兜底）。
-				</p>
+				<button className="btn primary" onClick={() => setEditing(emptyEdit())}>
+					新建站点
+				</button>
 			</div>
+			<p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>
+				一套部署服务多个域名：每个域名按 Host 命中一个站点。当前生效站点 <b>{currentCode}</b>，默认站
+				<b> {defaultCode}</b> 兜底未知域名。
+			</p>
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
 
 			<div className="admin-panel">
-				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-					<h3 style={{ margin: 0 }}>站点列表</h3>
-					<button className="btn primary" onClick={() => setEditing(emptyEdit())}>
-						新建站点
-					</button>
+				<div className="site-toolbar">
+					<input
+						placeholder="搜索站点标识 / 名称 / 域名"
+						value={keyword}
+						onChange={(e) => setKeyword(e.target.value)}
+					/>
+					<div className="admin-tabs" style={{ margin: 0 }}>
+						<button className={filter === "all" ? "on" : ""} onClick={() => setFilter("all")}>
+							全部 {sites.length}
+						</button>
+						<button className={filter === "active" ? "on" : ""} onClick={() => setFilter("active")}>
+							启用
+						</button>
+						<button className={filter === "off" ? "on" : ""} onClick={() => setFilter("off")}>
+							停用
+						</button>
+					</div>
+					<span className="muted" style={{ fontSize: 12 }}>
+						{shown.length} / {sites.length} 个站点
+					</span>
 				</div>
-				<table className="admin-table platform-table" style={{ marginTop: 12 }}>
-					<thead>
-						<tr>
-							<th>标识</th>
-							<th>名称</th>
-							<th>绑定域名</th>
-							<th>内容量</th>
-							<th>状态</th>
-							<th>操作</th>
-						</tr>
-					</thead>
-					<tbody>
-						{sites.map((s) => {
-							const st = stats[s.code];
-							return (
-								<tr key={s.id}>
-									<td>
-										<b>{s.code}</b>
-										{s.code === defaultCode ? <div className="muted" style={{ fontSize: 12 }}>默认站</div> : null}
-									</td>
-									<td>
-										{s.name}
-										<div className="muted" style={{ fontSize: 12 }}>{s.companyName}</div>
-									</td>
-									<td className="muted" style={{ fontSize: 12 }}>
-										{s.domains.length ? s.domains.join("、") : "未绑定域名"}
-									</td>
-									<td className="muted" style={{ fontSize: 12 }}>
-										新闻 {st?.news ?? 0} · 产品 {st?.products ?? 0} · 留言 {st?.feedback ?? 0}
-									{st?.initialized ? "" : " · 未初始化"}
-									</td>
-									<td>
-										<span className={`tag${s.isActive === 1 ? "" : " off"}`}>{s.isActive === 1 ? "启用" : "停用"}</span>
-									</td>
-									<td>
-										<button className="btn small" onClick={() => setEditing(toState(s))}>
-											编辑
-										</button>{" "}
-										<button className="btn small" onClick={() => toggleActive(s)}>
-											{s.isActive === 1 ? "停用" : "启用"}
-										</button>{" "}
-										<button className="btn small" onClick={() => scaffold(s)}>
-											初始化内容
-										</button>{" "}
-										<button className="btn small danger" disabled={s.code === defaultCode} onClick={() => remove(s)}>
-											删除
-										</button>
-									</td>
-								</tr>
-							);
-						})}
-						{!sites.length ? (
-							<tr>
-								<td colSpan={6} className="empty-tip">
-									暂无站点
-								</td>
-							</tr>
-						) : null}
-					</tbody>
-				</table>
+
+				<div className="site-cards">
+					{shown.map((s) => {
+						const st = stats[s.code];
+						const cov = coverage[s.code];
+						const bannerMissing = cov ? cov.bannerTotal - cov.bannerCount : 0;
+						return (
+							<div className={`site-card${s.isActive === 1 ? "" : " off"}`} key={s.id}>
+								<div className="site-card-head">
+									<div>
+										<div className="site-card-name">{s.name}</div>
+										<div className="site-card-code">
+											{s.code}
+											{s.code === defaultCode ? <span className="tag">默认站</span> : null}
+											<span className={`tag${s.isActive === 1 ? "" : " off"}`}>
+												{s.isActive === 1 ? "启用" : "停用"}
+											</span>
+										</div>
+									</div>
+									<button className="btn small" onClick={() => setEditing(toState(s))}>
+										编辑
+									</button>
+								</div>
+								<div className="site-card-domains">
+									{s.domains.length ? s.domains.join("、") : "未绑定域名"}
+								</div>
+								<div className="site-card-meta">
+									<span>新闻 {st?.news ?? 0}</span>
+									<span>产品 {st?.products ?? 0}</span>
+									<span>留言 {st?.feedback ?? 0}</span>
+									{cov ? (
+										<span className={bannerMissing ? "warn" : ""}>
+											头图 {cov.bannerCount}/{cov.bannerTotal}
+										</span>
+									) : null}
+									{cov ? <span className={cov.slideCount ? "" : "warn"}>轮播 {cov.slideCount} 张</span> : null}
+								</div>
+								<div className="site-card-ops">
+									<button className="btn small" onClick={() => setMediaCode(s.code)}>
+										素材维护
+									</button>
+									<button className="btn small" onClick={() => toggleActive(s)}>
+										{s.isActive === 1 ? "停用" : "启用"}
+									</button>
+									<button className="btn small" onClick={() => scaffold(s)}>
+										初始化内容
+									</button>
+									<button className="btn small danger" disabled={s.code === defaultCode} onClick={() => remove(s)}>
+										删除
+									</button>
+								</div>
+							</div>
+						);
+					})}
+					{!shown.length ? <div className="empty-tip">没有匹配的站点</div> : null}
+				</div>
 			</div>
 
-			<BannerMatrix onMsg={flash} />
+			{mediaSite ? (
+				<MediaPanel
+					site={mediaSite}
+					onClose={() => setMediaCode("")}
+					onMsg={flash}
+					onChanged={load}
+				/>
+			) : null}
 
 			{editing ? (
 				<div className="modal-mask" onClick={() => !busy && setEditing(null)}>
@@ -274,11 +328,15 @@ export default function PlatformAdmin() {
 									<label>服务邮箱</label>
 									<input value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
 								</div>
-								<div className="admin-field">
-									<label>Logo 地址（/assets/... 或 https://）</label>
-									<input value={editing.logoUrl} onChange={(e) => setEditing({ ...editing, logoUrl: e.target.value })} />
-								</div>
 							</div>
+							<ImageField
+								label="站点 Logo"
+								value={editing.logoUrl}
+								onChange={(p) => setEditing({ ...editing, logoUrl: p })}
+								ratio="4 / 1"
+								hint="建议透明底 PNG，宽度 ≥ 400"
+								siteCode={editing.id != null ? editing.code : undefined}
+							/>
 							<div className="admin-row">
 								<div className="admin-field">
 									<label>主色</label>
@@ -362,134 +420,178 @@ export default function PlatformAdmin() {
 	);
 }
 
-/** 跨站头图矩阵：行=菜单页，列=站点；一次看全 3 个平台每页的头图，可直接上传/清除 */
-function BannerMatrix({ onMsg }: { onMsg: (ok: boolean, text: string) => void }) {
-	type Cell = { pic: string; url: string; updated: string };
-	const [data, setData] = useState<{
-		pages: { page: string; label: string }[];
-		sites: { code: string; name: string; isActive: number }[];
-		matrix: Record<string, Record<string, Cell>>;
-	} | null>(null);
-	const [busyKey, setBusyKey] = useState("");
+/** 单站素材维护：6 个菜单页头图 + 首页 banner 轮播 */
+function MediaPanel({
+	site,
+	onClose,
+	onMsg,
+	onChanged,
+}: {
+	site: PlatformSite;
+	onClose: () => void;
+	onMsg: (ok: boolean, text: string) => void;
+	onChanged: () => void;
+}) {
+	const [banners, setBanners] = useState<{ page: string; label: string; pic: string; url: string; updated: string }[]>([]);
+	const [slides, setSlides] = useState<SlideItem[]>([]);
+	const [busy, setBusy] = useState("");
+	const [loading, setLoading] = useState(true);
 
-	const loadBanners = () =>
-		adminApi
-			.platformBanners()
-			.then((d) => setData({ pages: d.pages, sites: d.sites, matrix: d.matrix }))
-			.catch((e) => onMsg(false, e instanceof Error ? e.message : "头图加载失败"));
-
-	useEffect(() => {
-		loadBanners();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
-
-	const upload = async (code: string, page: string, file?: File | null) => {
-		if (!file) return;
-		const key = `${code}/${page}`;
-		setBusyKey(key);
+	const load = async () => {
 		try {
-			await adminApi.uploadPlatformBanner(code, page, file);
-			onMsg(true, `已更新 ${code} / ${page} 头图`);
-			await loadBanners();
+			const [b, s] = await Promise.all([adminApi.platformBannerDetail(site.code), adminApi.platformSlides(site.code)]);
+			setBanners(b.items);
+			setSlides(s.items);
 		} catch (e) {
-			onMsg(false, e instanceof Error ? e.message : "上传失败");
+			onMsg(false, e instanceof Error ? e.message : "素材加载失败");
 		} finally {
-			setBusyKey("");
+			setLoading(false);
 		}
 	};
 
-	const clear = async (code: string, page: string) => {
-		if (!confirm(`清除 ${code} 的「${page}」头图？清除后该站该页不再显示 banner 区域。`)) return;
-		const key = `${code}/${page}`;
-		setBusyKey(key);
+	useEffect(() => {
+		setLoading(true);
+		load();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [site.code]);
+
+	const after = async () => {
+		await load();
+		onChanged();
+	};
+
+	const uploadBanner = async (page: string, file?: File | null) => {
+		if (!file) return;
+		setBusy(`banner:${page}`);
 		try {
-			await adminApi.clearPlatformBanner(code, page);
-			onMsg(true, `已清除 ${code} / ${page} 头图`);
-			await loadBanners();
+			await adminApi.uploadPlatformBanner(site.code, page, file);
+			onMsg(true, `${site.code} 的头图已更新`);
+			await after();
 		} catch (e) {
-			onMsg(false, e instanceof Error ? e.message : "清除失败");
+			onMsg(false, e instanceof Error ? e.message : "上传失败");
 		} finally {
-			setBusyKey("");
+			setBusy("");
+		}
+	};
+
+	const clearBanner = async (page: string) => {
+		if (!confirm("清除这张头图？前台该页将不再显示 banner 区域。")) return;
+		setBusy(`banner:${page}`);
+		try {
+			await adminApi.clearPlatformBanner(site.code, page);
+			onMsg(true, "头图已清除");
+			await after();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "操作失败");
+		} finally {
+			setBusy("");
+		}
+	};
+
+	const addSlide = async (file?: File | null) => {
+		if (!file) return;
+		setBusy("slide:add");
+		try {
+			const up = await adminApi.uploadFilesFor(site.code, file);
+			await adminApi.platformAddSlide(site.code, { pic: up.path, title: "", order: 0 });
+			onMsg(true, "已添加一张首页轮播");
+			await after();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "添加失败");
+		} finally {
+			setBusy("");
+		}
+	};
+
+	const patchSlide = async (id: number, b: { order?: number; isShow?: number; title?: string; link?: string }) => {
+		setBusy(`slide:${id}`);
+		try {
+			await adminApi.platformUpdateSlide(site.code, id, b);
+			await after();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "保存失败");
+		} finally {
+			setBusy("");
+		}
+	};
+
+	const delSlide = async (id: number) => {
+		if (!confirm("删除这张轮播？（前台立即不再显示，图片文件保留）")) return;
+		setBusy(`slide:${id}`);
+		try {
+			await adminApi.platformDelSlide(site.code, id);
+			onMsg(true, "轮播已删除");
+			await after();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "删除失败");
+		} finally {
+			setBusy("");
 		}
 	};
 
 	return (
-		<div className="admin-panel">
-			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-				<h3 style={{ margin: 0 }}>内页头图（跨站点统一维护）</h3>
-				<span className="muted" style={{ fontSize: 12 }}>
-					每格 = 一个站点的某个菜单页；留空的页面前台不渲染 banner
-				</span>
+		<div className="admin-panel media-panel">
+			<div className="media-head">
+				<h3 style={{ margin: 0 }}>
+					素材维护：{site.name}（{site.code}）
+				</h3>
+				<button className="btn small" onClick={onClose}>
+					收起
+				</button>
 			</div>
-			<div className="banner-matrix">
-				<table className="admin-table">
-					<thead>
-						<tr>
-							<th style={{ width: 120 }}>菜单页</th>
-							{(data?.sites ?? []).map((s) => (
-								<th key={s.code}>
-									{s.name || s.code}
-									<div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>
-										{s.code}
-										{s.isActive === 1 ? "" : "（停用）"}
-									</div>
-								</th>
-							))}
-						</tr>
-					</thead>
-					<tbody>
-						{(data?.pages ?? []).map((p) => (
-							<tr key={p.page}>
-								<td>
-									<b>{p.label}</b>
-									<div className="muted" style={{ fontSize: 12 }}>{p.page}</div>
-								</td>
-								{(data?.sites ?? []).map((s) => {
-									const cell = data?.matrix?.[s.code]?.[p.page];
-									const key = `${s.code}/${p.page}`;
-									const busy = busyKey === key;
-									return (
-										<td key={s.code}>
-											<div className="banner-cell">
-												<div className="banner-thumb">
-													{cell?.pic ? <img src={cell.url} alt="" /> : <span className="muted">未维护</span>}
-												</div>
-												<div className="banner-ops">
-													<label className={`btn small${busy ? " disabled" : ""}`}>
-														{busy ? "处理中…" : cell?.pic ? "替换" : "上传"}
-														<input
-															type="file"
-															accept="image/jpeg,image/png,image/gif,image/webp"
-															hidden
-															disabled={busy}
-															onChange={(e) => {
-																upload(s.code, p.page, e.target.files?.[0]);
-																e.currentTarget.value = "";
-															}}
-														/>
-													</label>
-													{cell?.pic ? (
-														<button className="btn small danger" disabled={busy} onClick={() => clear(s.code, p.page)}>
-															清除
-														</button>
-													) : null}
-												</div>
-											</div>
-										</td>
-									);
-								})}
-							</tr>
-						))}
-						{!data?.pages?.length ? (
-							<tr>
-								<td colSpan={4} className="empty-tip">
-									加载中…
-								</td>
-							</tr>
-						) : null}
-					</tbody>
-				</table>
-			</div>
+
+			<h4 className="media-sub">内页头图（6 个菜单页，每页一张；留空则前台不显示 banner）</h4>
+			{loading ? (
+				<div className="empty-tip">加载中…</div>
+			) : (
+				<div className="banner-grid">
+					{banners.map((b) => (
+						<div className="banner-slot" key={b.page}>
+							{b.url ? (
+								<img src={b.updated ? `${b.url}?v=${encodeURIComponent(b.updated)}` : b.url} alt={b.label} />
+							) : (
+								<div className="banner-slot-empty">未配置（前台不显示）</div>
+							)}
+							<div className="banner-slot-meta">
+								<span>{b.label}</span>
+								<label className="btn small">
+									{busy === `banner:${b.page}` ? "处理中…" : b.url ? "替换" : "上传"}
+									<input
+										type="file"
+										accept="image/jpeg,image/png,image/gif,image/webp"
+										hidden
+										disabled={busy === `banner:${b.page}`}
+										onChange={(e) => {
+											uploadBanner(b.page, e.target.files?.[0] ?? null);
+											e.target.value = "";
+										}}
+									/>
+								</label>
+								{b.url ? (
+									<button
+										className="btn small"
+										disabled={busy === `banner:${b.page}`}
+										onClick={() => clearBanner(b.page)}
+									>
+										清除
+									</button>
+								) : null}
+							</div>
+						</div>
+					))}
+				</div>
+			)}
+
+			<h4 className="media-sub" style={{ marginTop: 22 }}>
+				首页 banner 轮播（可多张，排序大的先播）
+			</h4>
+			<SlideEditor
+				items={slides}
+				busy={busy}
+				onAdd={addSlide}
+				onPatch={patchSlide}
+				onDelete={delSlide}
+			/>
 		</div>
 	);
 }

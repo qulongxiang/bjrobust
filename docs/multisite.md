@@ -19,7 +19,8 @@
 | `t_sites` | 站点（租户）主表 | `Code` 唯一，`Theme` 存 JSON 主题色，`IsActive=0` 即整站 503 |
 | `t_site_domain` | 域名 → 站点 | `Host` 唯一（小写、去 `www.`、去端口），一个站点可绑多个域名 |
 | `t_throttle` | 登录限流计数 | 跨节点生效，替代原先的 isolate 内存计数 |
-| `t_banner` | 内页头图 | 每站每个页面一行（`SiteId` + `Page` 唯一），`Pic` 为 R2 键；`Pic` 为空表示该页不配图，前台用主题渐变底 |
+| `t_banner` | 内页头图 | 每站每个页面一行（`SiteId` + `Page` 唯一），`Pic` 为 R2 键；`Pic` 为空表示该页不配图，前台**整块不渲染** banner |
+| `t_slide` | 首页 banner 轮播 | 每站多行（`SiteId` + `OrderBy` 排序），`Pic` 为 R2 键，`IsShow` 控制显隐；没有记录时前台不显示轮播 |
 | `t_news` / `t_products` / `t_protype` / `t_img` / `t_content` / `t_global` / `t_feedback` / `t_log` | 业务表 | 每行带 `SiteId`；存量数据全部归 `SiteId=1`（bjrobust） |
 | `t_newtype` | 新闻/案例类型字典 | 保持全局，不按站点分（前台过滤仍带 SiteId） |
 | `t_admin` | 管理员 | `SiteId=0` 为平台超管（可跨站）；`>0` 为站点管理员（只能管本站） |
@@ -124,9 +125,43 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 上传落 `cn-banner/<站点Code>/<page>.<扩展名>`；替换同一页会覆盖同名对象；只校验文件头（jpg/png/gif/webp），单文件上限 5MB。
 - 前台：`GET /api/site/banners` 一次返回本站所有页面图，`PageHero` 按 `page` 取图；**取不到图时整块 banner 区域不渲染**（不会留渐变占位），页面直接从标题栏开始。
 - 后台本站维护：`/admin/site` 的"内页头图"面板（`GET/PUT/DELETE /api/admin/banners[/:page]`），操作的是"当前生效站点"。
-- 后台跨站维护（超管）：`/admin/platform` 的"内页头图（跨站点统一维护）"矩阵，行=6 个菜单页、列=所有站点，每格可上传/替换/清除，一眼看出哪站哪页还没配图。接口 `GET /api/admin/platform/banners`（返回 `pages / sites / matrix`）、`PUT|DELETE /api/admin/platform/banners/:code/:page`，非超管一律 403。
+- 后台跨站维护（超管）：在 `/admin/platform` 的站点列表里点某站的**"素材维护"**，展开该站的头图 + 首页轮播面板（行=6 个菜单页，可上传/替换/清除）。
+  - `GET /api/admin/platform/banners` 只返回**每站概览**（`bannerCount/bannerTotal/slideCount`），站点多时也是一个请求；
+  - `GET /api/admin/platform/banners/:code` 取单站明细，`PUT|DELETE /api/admin/platform/banners/:code/:page` 改单站单页；
+  - 非超管访问这些接口一律 403。
 - 清除只把 `Pic` 置空，不删 R2 对象，误删可凭文件名重传。
-- 站点管理员在自己的 `站点设置` 里改本站；超管在平台矩阵里一次改三家，二者读写同一张表，不会出现两套数据。
+- 站点管理员在自己的 `站点设置` 里改本站；超管在平台卡片里点"素材维护"改任意站，二者读写同一张表，不会出现两套数据。
+
+## 6.1 首页 banner 轮播（`t_slide`）
+
+- 首页那组滚动图原来挂在 `t_news NewType=1` 上，后台无处可改；现在独立成表 `t_slide`：`SiteId / Pic / Title / Link / OrderBy / IsShow / NoteTime`，`Pic` 同样存 R2 键（如 `upload/aaaa/x.jpg`，bjrobust 兼容老的裸文件名）。
+- 前台 `GET /api/site/home` 的 `banners` 先读 `t_slide`（只取 `IsShow=1`，按 `OrderBy` 升序），表里没有数据才回退老的 `t_news` 逻辑；`aaaa`/`bbbb` 两站没配就没有轮播区。
+- 迁移脚本 `tools/migrate_multisite.mjs` 建表后会把每站 `t_news NewType=1 且 SmallPic<>''` 的记录搬进 `t_slide`，只搬一次（`NoteTime` 作标记）。线上 bjrobust 已搬入 4 张。
+- 维护入口两处，读写同一张表：
+  - 站点管理员：`/admin/site` 的"首页 banner 轮播（可多张，各站点独立）"，接口 `GET/POST/PUT/DELETE /api/admin/slides[/:id]`；
+  - 超管：`/admin/platform` → 某站"素材维护" → 首页轮播，接口 `GET/POST /api/admin/platform/slides/:code`、`PUT/DELETE /api/admin/platform/slides/:code/:id`。
+- 轮播只需要图片路径，先走通用上传 `POST /api/admin/upload` 拿到 `path` 再提交，不用 multipart。
+
+## 6.2 平台管理布局（撑得住几十个域名）
+
+- `/admin/platform` 从"宽表格"改成**卡片网格**：`repeat(auto-fill, minmax(300px, 1fr))`，40 个站点自动折行，不再横向撑爆。
+- 顶部工具条：搜索（code / 名称 / 公司名 / 域名）、状态筛选（全部 / 启用 / 停用）、站点计数。卡片显示 code、默认站/停用标签、域名列表、新闻/产品/留言数、`头图 n/6`（缺页时橙色告警）、`轮播 n 张`。
+- 卡片操作：编辑（含 Logo 上传）/ 素材维护 / 启停 / 初始化内容 / 删除。点"素材维护"在卡片下方展开该站面板，一次只展开一个站，避免几十站同时渲染一堆上传控件。
+- 站点再多也不改这套交互；概览接口 `GET /api/admin/platform/banners` 用两条 `GROUP BY` 聚合，一个请求拿到所有站的计数。
+
+## 6.3 图片一律走上传控件
+
+- 新增 `admin/components/ImageField.tsx`：缩略图预览 + "上传/替换" + "清除" + 折叠的"手填路径"（兼容历史数据/外链）。`siteCode` 可指定上传到哪个站点目录，未指定时用当前生效站点。
+- 已替换：产品添加/产品编辑的缩略图、新闻编辑的缩略图、站点设置里的 Logo。轮播用 `SlideEditor.tsx`（缩略图 + 标题 + 链接 + 排序 + 显隐 + 删除 + "+ 上传一张轮播图"），被 `SiteAdmin` 与 `PlatformAdmin` 复用。
+- 上传统一校验文件头（jpg/png/gif/webp，5MB 上限）并落 R2；数据库只存键。
+
+## 6.4 分站管理员：各管一摊
+
+- 判权只看 `t_admin.SiteId`：`0` = 平台超管（可跨站、可建平台级账号），`>0` = 站点管理员。
+- 站点管理员只能看到本站数据（新闻/产品/留言/头图/轮播/用户列表都按 `SiteId` 过滤），访问 `/api/admin/platform/*` 一律 403。
+- 用户管理：超管建号可指定所属站点（"平台级（超管）"或任一站点）；站点管理员建号强制落本站，显式传 `siteId:0` 返回 403。
+- 重置密码/锁定：本人可改自己，本站账号可改，平台级账号只有超管能改，跨站必须切站。
+- 角色串不再从建号人复制，按站点写死（`0/平台超管` 或 `1/站点管理员`）。早期版本复制角色串会把 `admin` 串带到新账号，导致站点管理员被误判成超管（已修）。
 
 ## 7. 已知限制（后续可做）
 
@@ -146,7 +181,9 @@ Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/news?page=1&size=1   #
 Invoke-RestMethod https://aaaa.qlxtools.asia/api/site/news?page=1&size=1       # total=1（空白模板）
 Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/banners             # 6 个页面都有 pic
 Invoke-RestMethod https://bbbb.qlxtools.asia/api/site/banners                 # pages={}，该站内页无 banner 区域
+Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/home                # banners 4 条（来自 t_slide）
+Invoke-RestMethod https://aaaa.qlxtools.asia/api/site/home                    # banners 为空数组，首页无轮播区
 ```
 
-线上后台用你自己的管理员密码登录后：`/admin` 顶部能看到站点下拉（超管），`/admin/platform` 能建站/绑域名/启停，以及一次维护所有站点的每个菜单头图。
+线上后台用你自己的管理员密码登录后：`/admin` 顶部能看到站点下拉（超管），`/admin/platform` 是站点卡片网格（搜索/筛选/素材维护），站点管理员登录后只看到本站菜单与本站数据。
 

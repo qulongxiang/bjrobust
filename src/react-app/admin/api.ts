@@ -120,6 +120,19 @@ export type AdminUserRow = {
 	status: number;
 	loginTime: string;
 	userType: number;
+	siteId: number;
+};
+
+/** 首页 banner 轮播（t_slide） */
+export type SlideItem = {
+	id: number;
+	pic: string;
+	url: string;
+	title: string;
+	link: string;
+	order: number;
+	isShow: number;
+	updated: string;
 };
 
 export type ProType = {
@@ -232,8 +245,16 @@ export const adminApi = {
 	setUserLock: (id: number, locked: number) =>
 		req<{ ok: boolean }>(`/api/admin/users/${id}/lock`, { method: "PUT", body: j({ locked }) }),
 
-	addUser: (b: { username: string; password: string; called?: string }) =>
+	addUser: (b: { username: string; password: string; called?: string; siteId?: number }) =>
 		req<{ ok: boolean; id: number }>("/api/admin/users", { method: "POST", body: j(b) }),
+
+	// ---- 首页 banner 轮播（当前站点） ----
+	slides: () => req<{ ok: boolean; items: SlideItem[] }>("/api/admin/slides"),
+	addSlide: (b: { pic: string; title?: string; link?: string; order?: number }) =>
+		req<{ ok: boolean; id: number }>("/api/admin/slides", { method: "POST", body: j(b) }),
+	updateSlide: (id: number, b: { pic?: string; title?: string; link?: string; order?: number; isShow?: number }) =>
+		req<{ ok: boolean }>(`/api/admin/slides/${id}`, { method: "PUT", body: j(b) }),
+	delSlide: (id: number) => req<{ ok: boolean }>(`/api/admin/slides/${id}`, { method: "DELETE" }),
 
 	stats: () =>
 		req<{
@@ -332,14 +353,28 @@ export const adminApi = {
 	deletePlatformSite: (id: number, force = false) =>
 		req<{ ok: boolean }>(`/api/admin/platform/sites/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
 
-	// ---- 跨站头图矩阵（仅超管） ----
+	// ---- 平台素材（仅超管） ----
 	platformBanners: () =>
 		req<{
 			ok: boolean;
 			pages: { page: string; label: string }[];
-			sites: { code: string; name: string; isActive: number }[];
-			matrix: Record<string, Record<string, { pic: string; url: string; updated: string }>>;
+			sites: {
+				id: number;
+				code: string;
+				name: string;
+				isActive: number;
+				bannerCount: number;
+				bannerTotal: number;
+				slideCount: number;
+			}[];
 		}>("/api/admin/platform/banners"),
+	platformBannerDetail: (code: string) =>
+		req<{
+			ok: boolean;
+			code: string;
+			pages: { page: string; label: string }[];
+			items: { page: string; label: string; pic: string; url: string; updated: string }[];
+		}>(`/api/admin/platform/banners/${code}`),
 	uploadPlatformBanner: (code: string, page: string, file: File): Promise<{ ok: boolean }> => {
 		const form = new FormData();
 		form.append("file", file);
@@ -356,4 +391,33 @@ export const adminApi = {
 	},
 	clearPlatformBanner: (code: string, page: string) =>
 		req<{ ok: boolean }>(`/api/admin/platform/banners/${code}/${page}`, { method: "DELETE" }),
+
+	// 平台级首页轮播
+	platformSlides: (code: string) =>
+		req<{ ok: boolean; items: SlideItem[] }>(`/api/admin/platform/slides/${code}`),
+	platformAddSlide: (code: string, b: { pic: string; title?: string; link?: string; order?: number }) =>
+		req<{ ok: boolean; id: number }>(`/api/admin/platform/slides/${code}`, { method: "POST", body: j(b) }),
+	platformUpdateSlide: (
+		code: string,
+		id: number,
+		b: { pic?: string; title?: string; link?: string; order?: number; isShow?: number },
+	) => req<{ ok: boolean }>(`/api/admin/platform/slides/${code}/${id}`, { method: "PUT", body: j(b) }),
+	platformDelSlide: (code: string, id: number) =>
+		req<{ ok: boolean }>(`/api/admin/platform/slides/${code}/${id}`, { method: "DELETE" }),
+
+	/** 把图片上传到"指定站点"目录（超管跨站维护素材用） */
+	uploadFilesFor: (code: string, file: File): Promise<{ ok: boolean; path: string; url: string }> => {
+		const form = new FormData();
+		form.append("file", file);
+		return fetch("/api/admin/upload", {
+			method: "POST",
+			credentials: "same-origin",
+			headers: { "X-CSRF": "1", "X-Site-Code": code },
+			body: form,
+		}).then(async (r) => {
+			const d = (await r.json().catch(() => ({}))) as { ok?: boolean; path?: string; url?: string; error?: string };
+			if (!r.ok) throw new ApiError(r.status, d.error ?? `HTTP ${r.status}`);
+			return d as { ok: true; path: string; url: string };
+		});
+	},
 };

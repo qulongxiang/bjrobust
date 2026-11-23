@@ -31,6 +31,10 @@ const MENUS: MenuItem[] = [
 export type AdminCtx = {
 	user: AdminUser;
 	onLogout: () => void;
+	/** 超管可选的站点列表（站点管理员为空） */
+	sites: SiteSummary[];
+	/** 当前生效站点的 code */
+	siteCode: string;
 };
 
 export default function AdminLayout({
