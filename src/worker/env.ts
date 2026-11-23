@@ -38,6 +38,10 @@ export type AppEnv = Env & {
 	SITE_HOST_MAP?: string;
 	/** 本地开发用：允许 X-Site-Code 头 / __site 查询参数覆盖 Host 解析（"1" 开启） */
 	ALLOW_SITE_OVERRIDE?: string;
+	/** 旧布局兼容：upload/<code>/…、upload/<文件名> 等回退是否打开（"1" = 开，默认关） */
+	LEGACY_LOOKUP?: string;
+	/** 租户查询护栏：缺 SiteId 的租户表查询是否直接抛错（"strict" = 抛错，默认只告警） */
+	DB_GUARD?: string;
 };
 
 export type SiteTheme = {

@@ -9,6 +9,7 @@ import type { AppEnv, AdminVariables, SiteInfo } from "../env";
 import { nowSql } from "../lib/auth";
 import { exec, rows } from "../lib/d1";
 import { publicSlides } from "../lib/slide";
+import { assetCandidates, cacheControlFor, legacyEnabled } from "../lib/storage";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -489,9 +490,8 @@ app.post("/feedback", async (c) => {
 export default app;
 
 // ---- R2 图片：/assets/<key> ----
-// 桶根直接是站点目录：<站点Code>/upload/<年>/<月>/<日>/<文件名>、<站点Code>/cn-banner/<年>/<月>/<日>/<文件名>
-// 兼容：上一版 upload/<code>/… 、cn-banner/<code>/…，以及老 PHP 站的 upload/<文件名>
-// 读取时先试精确 key，再按上面几种旧布局回退
+// 布局与回退规则统一在 lib/storage.ts：默认只认精确 key（坏链就如实 404），
+// 需要临时兼容旧布局时把 LEGACY_LOOKUP=1 打开
 const MIME_BY_EXT: Record<string, string> = {
 	".jpg": "image/jpeg",
 	".jpeg": "image/jpeg",
@@ -517,24 +517,10 @@ assetsApp.get("/*", async (c) => {
 	if (!bucket) return c.notFound(); // R2 未开通
 	const site = c.get("site") as SiteInfo | undefined;
 	const code = site?.code ?? "";
-	let key = c.req.path.replace(/^\/assets\//, "");
+	const key = c.req.path.replace(/^\/assets\//, "");
 	if (!key) return c.notFound();
 
-	const tries: string[] = [key];
-	if (code) {
-		if (key.startsWith("upload/")) {
-			tries.push("upload/" + code + "/" + key.slice("upload/".length)); // 上一版 upload/<code>/…
-			tries.push(code + "/upload/" + key.slice("upload/".length));
-		} else if (key.startsWith("cn-banner/")) {
-			tries.push("cn-banner/" + code + "/" + key.slice("cn-banner/".length));
-			tries.push(code + "/cn-banner/" + key.slice("cn-banner/".length));
-		} else if (!key.startsWith(code + "/")) {
-			tries.push(code + "/upload/" + key); // 库内裸文件名
-		}
-	}
-	// 兼容库内裸文件名（无 upload/ 前缀）的历史图片
-	if (!key.startsWith("upload/") && !key.startsWith("cn-banner/")) tries.push("upload/" + key);
-
+	const tries = assetCandidates(key, code, legacyEnabled(c.env.LEGACY_LOOKUP));
 	let obj: Awaited<ReturnType<typeof bucket.get>> = null;
 	let hitKey = key;
 	for (const t of tries) {
@@ -549,7 +535,7 @@ assetsApp.get("/*", async (c) => {
 	return new Response(obj.body, {
 		headers: {
 			"Content-Type": contentTypeOf(hitKey, obj.httpMetadata?.contentType),
-			"Cache-Control": "public, max-age=86400",
+			"Cache-Control": cacheControlFor(hitKey),
 		},
 	});
 });

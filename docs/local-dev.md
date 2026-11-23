@@ -76,47 +76,48 @@ npm run dev
 # 多余的旧库文件可在 .wrangler/state/v3/d1/miniflare-D1DatabaseObject/ 里删除
 ```
 
-## 本地开发密钥
+## 本地开发密钥与开关
 
 `.dev.vars`（已在 .gitignore）：
 
 ```
-JWT_SECRET=...   # 本地会话签名密钥，生产必须换成随机值（wrangler secret put JWT_SECRET）
+JWT_SECRET=...          # 本地会话签名密钥，生产必须换成随机值（wrangler secret put JWT_SECRET）
+SITE_DEFAULT=bjrobust   # 没匹配到域名时的兜底站点
+ALLOW_SITE_OVERRIDE=1   # 允许超管用 X-Site-Code 切站（仅本地建议开）
 ```
+
+运行时开关（`--var NAME:value` 或 `wrangler secret put`）：
+
+```
+DB_GUARD=strict         # 租户 SQL 护栏：缺 SiteId 的 D1 查询直接抛错；不设则只打 [db-guard] 告警
+LEGACY_LOOKUP=1         # 打开旧布局图片回退（默认关；数据搬完后不要再开）
+```
+
+本地起严格护栏：
+
+```powershell
+npx wrangler dev --port 8795 --local --var DB_GUARD:strict
+```
+
+## 生产环境现状（2026-11-23）
+
+- 已上线三站：`bjrobust` / `aaaa` / `bbbb`（`*.qlxtools.asia` 自定义域），单 Worker + 单 D1 + 单 R2 桶，按 `Host` 分发租户。
+- 图片存量在 R2 `bjrobust/` 目录下（554 个对象，新布局 `<code>/upload/<年>/<月>/<日>/`、`<code>/cn-banner/...`）。
+- schema 有版本管理：`node tools/db_migrate.mjs status|apply`，基线是 `migrations/0001_baseline.sql`。
+- 运维接口 `/api/maint/*` **已删除**，存储运维走本地 `tools/storage_admin.mjs`（list / orphans / prune）。
+- 线上回归一条命令：`pwsh -File tools\smoke.ps1`（8 组断言，含跨站越权与 CSRF）。
 
 ## 生产部署（Cloudflare 账号操作）
 
-当前生产状态（2026-11-11 起）：**已上线，未接 R2**。D1 数据已灌完，Worker 正常；
-`wrangler.json` 里的 R2 绑定已临时移除，图片接口 404，前端显示灰色占位图（main.tsx 顶部）。
+固定三步，缺一不可：
 
-### 初始部署步骤（已完成，留档）
-
-```bash
-npx wrangler login                      # 浏览器 OAuth 登录
-npx wrangler d1 create bjrobust-db      # 记下输出的 database_id，填回 wrangler.json
-node tools/migrate.mjs remote           # 灌数据（用上面导出的最新 data.json）
-npx wrangler secret put JWT_SECRET      # 输入随机长字符串
-npm run build                           # 产出 dist/client + dist/worker
+```powershell
+npm run build
 npx wrangler deploy
+pwsh -File tools\smoke.ps1
 ```
 
-### 恢复 R2（账号开通 R2 后执行）
-
-```bash
-# 1) dashboard 开通 R2（免费计划即可）
-# 2) 建桶
-npx wrangler r2 bucket create bjrobust-images
-# 3) 在 wrangler.json 的 d1_databases 之后加回绑定：
-#    "r2_buckets": [ { "binding": "IMAGES", "bucket_name": "bjrobust-images" } ]
-# 4) 重新生成类型（env.ts 里可用生成的 R2Bucket 替换 R2BucketLike）
-npx wrangler types && npx tsc -b
-# 5) 推送 547 张历史图片（token 从 wrangler 凭据读取，勿打印）
-TOKEN=$(grep -oP 'oauth_token\s*=\s*"\K[^"]+' "$HOME/AppData/Roaming/xdg.config/.wrangler/config/default.toml" | head -1)
-CLOUDFLARE_API_TOKEN="$TOKEN" CLOUDFLARE_ACCOUNT_ID=ea1fab4be92f6b0809efef4bd03c5341 \
-  node tools/r2_push_remote.mjs
-# 6) 重新构建部署（可选：同时删掉 main.tsx 里的占位图逻辑）
-npm run build && npx wrangler deploy
-```
+首次起库（新环境）用 `node tools/db_migrate.mjs apply`，它会执行 `migrations/0001_baseline.sql` 并在 `t_migrations` 记账。
 
 ### 本机网络备注
 
@@ -129,15 +130,24 @@ npm run build && npx wrangler deploy
 
 ```
 src/worker/           Hono API（workerd 运行时）
-  index.ts            路由挂载 + 静态资源/SPA fallback
+  index.ts            路由挂载 + 静态资源/SPA fallback + 租户护栏中间件
   lib/auth.ts         JWT 会话 + bcrypt 校验 + 登录限流
   lib/d1.ts           D1 查询封装
+  lib/storage.ts      路径/key/归属/缓存策略的唯一权威
+  lib/db-guard.ts     租户 SQL 护栏（缺 SiteId 即告警/抛错）
+  lib/content.ts      富文本图片引用保存时收口
   routes/site.ts      前台 API（/api/site/*）+ R2 图片（/assets/*）
-  routes/admin-*.ts   后台 API（/api/admin/*，JWT 守卫）
+  routes/admin-*.ts   后台 API（/api/admin/*，CSRF + JWT 守卫）
 src/react-app/        React 19 SPA
   App.tsx / pages/    前台页面
   AdminApp.tsx / admin/  后台页面
+migrations/
+  0001_baseline.sql   全库基线（幂等）
 tools/
+  db_migrate.mjs      schema 版本：status / apply
+  storage_admin.mjs   R2 运维：list / orphans / prune（替代已删的 /api/maint/*）
+  smoke.ps1           线上回归（8 组断言）
+  gen_baseline.mjs    从线上库导出基线 SQL
   export_data.php     MariaDB → tools/data.json
   migrate.mjs         data.json → D1（local / remote 两种模式）
   r2_import.mjs       原站 upload/ → 本地 R2

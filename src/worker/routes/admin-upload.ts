@@ -1,35 +1,24 @@
 // 后台：图片上传到 R2
 // 桶根直接是站点目录：<站点Code>/upload/<年>/<月>/<日>/<文件名>，内页头图 <站点Code>/cn-banner/<年>/<月>/<日>/
-// bjrobust 的历史图片已迁到 bjrobust/upload/<年>/<月>/<日>/，读取由 /assets 精确命中
+// 路径规则统一在 lib/storage.ts，这里只做上传校验与调度
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { isBannerPage, readBannerEntries, saveBannerFile, setBannerPic } from "../lib/banner";
 import { ALLOWED_EXT, MAX_SIZE, sniffImage } from "../lib/upload";
+import { bareKey, imageKey, isOwnedKey, legacyEnabled } from "../lib/storage";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
 const R2_OFF_HINT = "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定";
-
-/** 北京时间（与老 PHP 站一致），给出 y/m/d 供目录使用 */
-function todayPath(): { y: string; m: string; d: string } {
-	const bj = new Date(Date.now() + 8 * 3600 * 1000);
-	const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-	return { y: String(bj.getUTCFullYear()), m: pad(bj.getUTCMonth() + 1), d: pad(bj.getUTCDate()) };
-}
 
 /** 站点私有前缀：<code>/upload/ */
 function uploadPrefix(siteCode: string): string {
 	return `${siteCode}/upload/`;
 }
 
-/** 站点私有 key / 老站兼容 key 的判定 */
-function isDeletable(path: string, siteCode: string): boolean {
-	const key = path.replace(/^\//, "");
-	if (key.startsWith(`${siteCode}/`)) return true; // 本站目录（upload / cn-banner 都算）
-	// bjrobust 兼容：上一版布局 upload/<code>/… 与老站的 upload/<文件名>
-	if (siteCode === "bjrobust" && (key.startsWith("upload/bjrobust/") || key.startsWith("cn-banner/bjrobust/"))) return true;
-	if (siteCode === "bjrobust" && key.startsWith("upload/") && !key.slice("upload/".length).includes("/")) return true;
-	return false;
+/** 站点私有 key 的判定（legacy 兜底由 LEGACY_LOOKUP 控制） */
+function isDeletable(path: string, siteCode: string, legacy: boolean): boolean {
+	return isOwnedKey(bareKey(path), siteCode, legacy);
 }
 
 app.post("/upload", async (c) => {
@@ -50,8 +39,7 @@ app.post("/upload", async (c) => {
 	if (!sniffed || sniffed !== declared) return c.json({ error: "文件内容与图片格式不符" }, 400);
 
 	const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-	const { y, m, d } = todayPath();
-	const key = `${uploadPrefix(site.code)}${y}/${m}/${d}/${name}`;
+	const key = imageKey(site.code, name);
 	await c.env.IMAGES.put(key, file.stream(), {
 		httpMetadata: { contentType: declared },
 	});
@@ -77,7 +65,7 @@ app.delete("/upload", async (c) => {
 	if (!c.env.IMAGES) return c.json({ error: R2_OFF_HINT }, 503);
 	const site = c.get("site");
 	const path = c.req.query("path") ?? "";
-	if (!isDeletable(path, site.code)) return c.json({ error: "路径不合法（不能删除其他站点的图片）" }, 400);
+	if (!isDeletable(path, site.code, legacyEnabled(c.env.LEGACY_LOOKUP))) return c.json({ error: "路径不合法（不能删除其他站点的图片）" }, 400);
 	await c.env.IMAGES.delete(path.replace(/^\//, ""));
 	return c.json({ ok: true });
 });

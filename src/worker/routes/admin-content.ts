@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
+import { normalizeContentImages } from "../lib/content";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -62,6 +63,7 @@ app.post("/news", async (c) => {
 	const title = String(b.title ?? "").trim().slice(0, 255);
 	if (!title) return c.json({ error: "标题不能为空" }, 400);
 	const now = nowSql();
+	const content = await normalizeContentImages(c.env, c.get("site").code, String(b.content ?? ""));
 	const res = await exec(
 		db.prepare(
 			'INSERT INTO t_news ("SiteId", Title, NoteTime, Content, UserName, IsShow, IsCommend, OrderBy, NewType, Hits, Language, Parent, SmallPic, WebTitle, WebKey, WebDesc, ShowTime, SJ, LINK, DOWN, MEMO) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -69,7 +71,7 @@ app.post("/news", async (c) => {
 		siteId,
 		title,
 		now,
-		String(b.content ?? ""),
+		content,
 		c.get("admin").UserName,
 		b.isShow === 0 || b.isShow === false ? 0 : 1,
 		b.isCommend === 1 || b.isCommend === true ? 1 : 0,
@@ -118,7 +120,8 @@ app.put("/news/:id", async (c) => {
 	const params: (string | number)[] = [];
 	for (const [k, col] of Object.entries(UPDATABLE)) {
 		if (!(k in b)) continue;
-		if (col === "IsShow" || col === "IsCommend") params.push(Number(b[k]) === 1 ? 1 : 0);
+		if (col === "Content") params.push(await normalizeContentImages(c.env, c.get("site").code, String(b[k] ?? "")));
+		else if (col === "IsShow" || col === "IsCommend") params.push(Number(b[k]) === 1 ? 1 : 0);
 		else if (col === "OrderBy" || col === "NewType") params.push(Number(b[k]) || 0);
 		else params.push(String(b[k] ?? ""));
 		sets.push(`${col} = ?`);

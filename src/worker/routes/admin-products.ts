@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
+import { normalizeContentImages } from "../lib/content";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -61,13 +62,14 @@ app.post("/products", async (c) => {
 	const name = String(b.name ?? "").trim().slice(0, 200);
 	if (!name) return c.json({ error: "产品名不能为空" }, 400);
 	const now = nowSql();
+	const content = await normalizeContentImages(c.env, c.get("site").code, String(b.content ?? ""));
 	const res = await exec(
 		db.prepare(
 			'INSERT INTO t_products ("SiteId", ProName, Content, Memo, NoteTime, SmallPic, IsShow, IsCommend, OrderBy, TypeID, Hits, Language, WebTitle, WebKey, WebDesc, BH, BZ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
 		),
 		siteId,
 		name,
-		String(b.content ?? ""),
+		content,
 		String(b.memo ?? ""),
 		now,
 		String(b.smallPic ?? ""),
@@ -113,7 +115,8 @@ app.put("/products/:id", async (c) => {
 	const params: (string | number)[] = [];
 	for (const [k, col] of Object.entries(UPDATABLE)) {
 		if (!(k in b)) continue;
-		if (col === "IsShow" || col === "IsCommend") params.push(Number(b[k]) === 1 ? 1 : 0);
+		if (col === "Content") params.push(await normalizeContentImages(c.env, c.get("site").code, String(b[k] ?? "")));
+		else if (col === "IsShow" || col === "IsCommend") params.push(Number(b[k]) === 1 ? 1 : 0);
 		else if (col === "OrderBy" || col === "TypeID") params.push(Number(b[k]) || 0);
 		else params.push(String(b[k] ?? ""));
 		sets.push(`${col} = ?`);

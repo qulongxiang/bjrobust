@@ -6,6 +6,7 @@ import type { AppEnv, AdminVariables } from "../env";
 import { isSuper, nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
 import { createSlide, deleteSlide, readSlides, updateSlide } from "../lib/slide";
+import { normalizeContentImages } from "../lib/content";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -111,7 +112,7 @@ app.put("/content/:called", async (c) => {
 	const siteId = c.get("siteId");
 	const called = c.req.param("called");
 	const b = await c.req.json().catch(() => null);
-	const content = String(b?.content ?? "");
+	const content = await normalizeContentImages(c.env, c.get("site").code, String(b?.content ?? ""));
 	if (content === "") return c.json({ error: "内容不能为空" }, 400);
 	const row = await db.prepare("SELECT id FROM t_content WHERE SiteId = ? AND Language = ? AND Called = ?").bind(siteId, CN, called).first();
 	if (row) {

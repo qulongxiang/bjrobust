@@ -55,9 +55,6 @@ export function csrfGuard(): MiddlewareHandler<{
 	return async (c, next) => {
 		const method = c.req.method.toUpperCase();
 		if (method === "GET" || method === "HEAD" || method === "OPTIONS") return await next();
-		const path = new URL(c.req.url).pathname;
-		// 登录本身还没有会话，且前端登录页会带 X-CSRF；这里放行以免旧客户端彻底不可用
-		if (path === "/api/admin/login") return await next();
 		if (c.req.header("x-csrf") !== "1") {
 			return c.json({ error: "缺少 X-CSRF 校验头" }, 403);
 		}

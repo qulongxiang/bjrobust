@@ -1,20 +1,14 @@
-# 分批调用运维迁移接口（复制 + 可选 purge）。使用前须先设 secret 并落本地令牌：
-#   npx wrangler secret put MAINT_TOKEN        # 输入一个随机串
-#   Set-Content .maint_token '<同一个随机串>'
-# 用完：npx wrangler secret delete MAINT_TOKEN 并删除 .maint_token
-Set-Location 'D:\softdata\text\bjrobust'
-$tok = (Get-Content .maint_token -Raw).Trim()
-$curl = "$env:SystemRoot\System32\curl.exe"
-$after = ''
-for ($i = 0; $i -lt 40; $i++) {
-	$o = [ordered]@{ dry = $false; purge = $true; limit = 40 }
-	if ($after) { $o['after'] = $after }
-	$body = ($o | ConvertTo-Json -Compress)
-	$r = & $curl -s -m 120 -X POST 'https://bjrobust.qlxtools.asia/api/maint/storage/migrate' -H 'Content-Type: application/json' -H ("X-Maint-Token: " + $tok) --data-binary $body
-	$j = $r | ConvertFrom-Json
-	"round=$i processed=$($j.processed) copied=$($j.copied) skipped=$($j.skipped) purged=$($j.purged) remaining=$($j.remaining) errors=$(@($j.errors).Count)"
-	if (@($j.errors).Count -gt 0) { $j.errors | Select-Object -First 3 }
-	if ($j.remaining -le 0) { break }
-	$after = $j.nextAfter
-	if (-not $after) { break }
-}
+# 已下线（2026-11-23）：原脚本调用线上 /api/maint/storage/migrate，该接口已从 Worker 移除。
+#
+# 旧对象（上一版布局 upload/<code>/…、桶根裸文件名）已经全部清理完毕，历史迁移任务结束。
+# 之后要做存储运维（列对象 / 对账 / 删对象），在本地跑：
+#
+#   node tools/storage_admin.mjs list [--prefix bjrobust/upload/]
+#   node tools/storage_admin.mjs orphans            # R2 孤儿 + 库内坏引用
+#   node tools/storage_admin.mjs prune --file keys.txt --yes
+#
+# 需要鉴权：wrangler 已登录（oauth_token 在 %APPDATA%\xdg.config\.wrangler\config\default.toml），
+# 或设 CLOUDFLARE_API_TOKEN。本文件保留仅为提示，不再执行任何远程写操作。
+
+Write-Host 'purge_legacy.ps1 已废弃，请改用 tools\storage_admin.mjs（见脚本头部注释）。'
+exit 1

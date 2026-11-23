@@ -3,6 +3,7 @@ import type { AppEnv, AdminVariables, SiteInfo } from "./env";
 import { adminGuard } from "./lib/auth";
 import { csrfGuard, securityHeaders } from "./lib/security";
 import { tenantMiddleware } from "./lib/tenant";
+import { guardedDB } from "./lib/db-guard";
 import adminAuth from "./routes/admin-auth";
 import adminPlatform from "./routes/admin-platform";
 import site, { assetsApp } from "./routes/site";
@@ -10,7 +11,6 @@ import adminContent from "./routes/admin-content";
 import adminProducts from "./routes/admin-products";
 import adminMisc from "./routes/admin-misc";
 import adminUpload from "./routes/admin-upload";
-import adminStorage, { migrateHandler } from "./routes/admin-storage";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -18,6 +18,19 @@ const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 app.use("*", securityHeaders());
 // 2) 按 Host 解析站点（租户）
 app.use("*", tenantMiddleware());
+// 2.5) 租户查询护栏：缺 SiteId 的租户表查询 → 告警（DB_GUARD=strict 时抛错）
+app.use("*", async (c, next) => {
+	const strict = c.env.DB_GUARD === "strict";
+	c.env.DB = guardedDB(c.env.DB, {
+		path: new URL(c.req.url).pathname,
+		onViolation: (v, path) => {
+			const msg = `[db-guard] ${path} 缺 SiteId: ${v.tables.join(",")} :: ${v.sql.slice(0, 160)}`;
+			if (strict) throw new Error(msg);
+			console.warn(msg);
+		},
+	});
+	await next();
+});
 
 // 3) 站点不存在 / 已停用：直接拦掉，避免把默认站内容错误地当成别的域名
 app.use("*", async (c, next) => {
@@ -40,16 +53,15 @@ app.use("*", async (c, next) => {
 app.get("/api/", (c) =>
 	c.json({ name: "bjrobust", ok: true, site: c.get("site").code }),
 );
+// 后台所有写请求统一过 CSRF（含登录：登录也是写操作，前端一直带 X-CSRF）
+app.use("/api/admin/*", csrfGuard());
 app.route("/api/admin", adminAuth);
-// 运维工具：自带令牌鉴权，不走后台 session/CSRF
-app.post("/api/maint/storage/migrate", migrateHandler);
-app.route("/api/maint", adminStorage);
+// 运维/迁移能力已下线：历史搬迁改由本地脚本 tools/storage_admin.mjs 完成（生产不再挂维护接口）
 app.route("/api/site", site);
 app.route("/assets", assetsApp);
 
-// 需要登录的后台 API：CSRF 校验 → JWT 守卫 → 各业务路由
+// 需要登录的后台 API：JWT 守卫 → 各业务路由（CSRF 已在上面统一挂过）
 const adminProtected = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
-adminProtected.use("*", csrfGuard());
 adminProtected.use("*", adminGuard());
 adminProtected.route("/", adminContent);
 adminProtected.route("/", adminProducts);

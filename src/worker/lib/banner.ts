@@ -3,6 +3,7 @@ import type { AppEnv, SiteInfo } from "../env";
 import { nowSql } from "./auth";
 import { exec, rows } from "./d1";
 import { ALLOWED_EXT, MAX_SIZE, sniffImage } from "./upload";
+import { bannerKey } from "./storage";
 
 /** 页面键与前端路由保持一致 */
 export const BANNER_PAGES: { page: string; label: string }[] = [
@@ -75,14 +76,9 @@ export async function setBannerPic(env: AppEnv, siteId: number, page: string, ke
 	}
 }
 
-/** 北京时间的 y/m/d，头图也按 站点/年/月/日 分层存放 */
-function bjDate(): [string, string, string] {
-	const bj = new Date(Date.now() + 8 * 3600 * 1000);
-	const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-	return [String(bj.getUTCFullYear()), pad(bj.getUTCMonth() + 1), pad(bj.getUTCDate())];
-}
-
-/** 上传并替换某站点某页头图：落到 <code>/cn-banner/<年>/<月>/<日>/<page>.<ext>，再写库 */
+/** 上传并替换某站点某页头图：落到 <code>/cn-banner/<年>/<月>/<日>/<page>-<版本>.<ext>，再写库
+ *  文件名自带版本 → 换图必换 key，不会被边缘/浏览器的一日缓存挡住
+ */
 export async function saveBannerFile(
 	env: AppEnv,
 	site: SiteInfo,
@@ -98,8 +94,7 @@ export async function saveBannerFile(
 	const sniffed = await sniffImage(file);
 	if (!sniffed) return { ok: false, error: "文件内容不是有效图片", status: 400 };
 
-	const [y, m, d] = bjDate();
-	const key = `${site.code}/cn-banner/${y}/${m}/${d}/${page}${ext}`;
+	const key = bannerKey(site.code, page, ext);
 	await env.IMAGES.put(key, file.stream(), { httpMetadata: { contentType: sniffed } });
 	await setBannerPic(env, site.id, page, key);
 	return { ok: true, pic: key };
