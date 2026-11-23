@@ -204,8 +204,9 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 
 - 靠人记约定迟早会漏一条 SQL，一旦漏了就是跨租户读数据。现在有一层运行时护栏：`src/worker/lib/db-guard.ts`。
 - 中间件里 `c.env.DB = guardedDB(c.env.DB, { path, onViolation })`，用 Proxy 包住 `prepare`：命中 `TENANT_TABLES`（t_news/t_products/t_img/t_slide/t_banner/t_content/t_global/t_feedback/t_protype/t_log）的 SQL，如果没有出现 `SiteId`，也没有显式写 `/* site:global */` 注释声明"这是全局表查询"，就判为违规。
-- 处理方式由 `DB_GUARD` 决定：`strict` → 直接抛错（5xx，问题挡在上线前）；未设置 → `console.warn` 打 `[db-guard] ...` 日志（先观察，不打断线上）。
-- 建议：本地/预发用 `strict`，线上先 `warn` 观察一周日志，确认没有误报后再上 `strict`。
+- 处理方式由 `DB_GUARD` 决定：`strict` → 直接抛错（5xx，问题挡在上线前）；未设置 → `console.warn` 打 `[db-guard] ...` 日志（只观察，不打断线上）。
+- **当前取值：`wrangler.json` 的 `vars.DB_GUARD = "strict"`，本地与线上都是 strict**（2026-11-23 起）。上线前已在本地用 strict 跑过前台 10 个接口、后台 19 个读接口、20 余个写/删接口（含建站与 scaffold）、公共留言，日志零 `[db-guard]`；上线后 smoke 32 项全绿，线上后台读接口全 200。
+- 临时降级：把 `DB_GUARD` 改成 `warn` 重新部署即可；但降级期间等于护栏失效，改完应尽快恢复。
 - 已知设计边界：护栏是**词法级**的（正则认 `from/into/update/join t_xxx`），挡得住"忘了写条件"，挡不住"写了 `SiteId` 但值是别的站"——后者靠路由层的 `site` 上下文取值，仍属约定，只是把最容易犯的错变成了硬错误。
 
 ## 6.7 schema 版本与回归

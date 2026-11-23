@@ -9,7 +9,8 @@
 	},
 	"upload_source_maps": true,
 	"vars": {
-		"SITE_DEFAULT": "bjrobust"
+		"SITE_DEFAULT": "bjrobust",
+		"DB_GUARD": "strict"
 	},
 	"routes": [
 		{ "pattern": "bjrobust.qlxtools.asia", "custom_domain": true },
