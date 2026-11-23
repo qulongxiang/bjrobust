@@ -122,6 +122,8 @@
 
 .admin-nav {
 	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
 	padding: 12px 10px;
 	display: flex;
 	flex-direction: column;
@@ -150,14 +152,66 @@
 	font-weight: 600;
 }
 
-/* 二级菜单：父项与顶级条目同样式（右侧带展开箭头），子项缩进 + 左侧竖线（旧后台树形菜单效果） */
+/* 二级菜单：父项是"折叠开关"（button，与顶级条目同视觉），子项缩进 + 左侧竖线 */
+.admin-nav .admin-menu-group {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.admin-nav .group-parent {
+	/* button 需要显式重置：宽度 100%、去掉默认边框/底色，才能和 <a> 的菜单项对齐 */
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	padding: 10px 14px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	font: inherit;
+	font-size: 14px;
+	color: #c7d2e2;
+	text-align: left;
+	cursor: pointer;
+}
+
+.admin-nav .group-parent:hover {
+	background: rgba(255, 255, 255, 0.07);
+	color: #fff;
+}
+
+/* 子页面命中时父项保留浅色高亮，明确"当前在这一组里" */
+.admin-nav .group-parent.has-active {
+	background: rgba(20, 80, 140, 0.45);
+	color: #fff;
+	font-weight: 600;
+}
+
 .admin-nav .group-caret {
-	float: right;
-	font-size: 10px;
+	font-size: 11px;
 	opacity: 0.65;
+	transition: transform 0.16s ease;
+}
+
+.admin-nav .group-caret.open {
+	transform: rotate(0deg);
+}
+
+.admin-nav .group-caret:not(.open) {
+	transform: rotate(-90deg);
+}
+
+.admin-nav .admin-sub-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
 }
 
 .admin-nav .admin-sub {
+	/* 父项现在可收起，子项样式不变：仍然 block，避免 inline 神秘消失 */
+	display: block;
 	margin: 0 10px 2px 20px;
 	padding: 9px 14px;
 	font-size: 13.5px;
@@ -448,6 +502,68 @@
 	background: #14508c;
 	border-color: #14508c;
 	color: #fff;
+}
+
+/* 产品分类筛选：按父分类分组，父分类一行、子分类整体换行——
+   之前每个分组套一层 inline-flex span，被 .admin-tabs 的 flex 挤压后
+   每组的"其他类"都会单独掉到下一行 */
+.type-filters {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 16px;
+}
+
+.type-filters .type-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.type-filters .type-row + .type-row {
+	padding-top: 10px;
+	border-top: 1px dashed #eef1f6;
+}
+
+.type-filters button {
+	padding: 7px 16px;
+	border: 1px solid #d7dce5;
+	border-radius: 18px;
+	background: #fff;
+	font-size: 13px;
+	color: #374151;
+	cursor: pointer;
+}
+
+.type-filters button:hover {
+	border-color: #14508c;
+	color: #14508c;
+}
+
+.type-filters button.on {
+	background: #14508c;
+	border-color: #14508c;
+	color: #fff;
+}
+
+.type-filters .type-parent {
+	flex-basis: 100%;
+	font-weight: 600;
+	color: #14508c;
+	border-color: #c9d6e6;
+	background: #f3f7fc;
+}
+
+.type-filters .type-parent.on {
+	background: #14508c;
+	border-color: #14508c;
+	color: #fff;
+}
+
+.type-filters .type-parent.has-child-on {
+	background: #e6effa;
+	color: #14508c;
+	border-color: #14508c;
 }
 
 /* 弹框 */

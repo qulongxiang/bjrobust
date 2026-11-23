@@ -2,7 +2,7 @@
 // 注意：user/onLogout 必须走 props——本组件在 <Outlet> 之外，
 // 这里调 useOutletContext() 会返回 null，解构直接抛错导致整个后台白屏（子页面在 Outlet 内部可正常使用）
 import { NavLink, useLocation } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AdminUser, SiteSummary, SiteTheme } from "./api";
 import "./admin.css";
 
@@ -27,6 +27,23 @@ const MENUS: MenuItem[] = [
 	{ to: "/admin/users", label: "用户管理" },
 	{ to: "/admin/platform", label: "平台管理", superOnly: true },
 ];
+
+// 折叠状态持久化：刷新/切页后仍保持用户的收起习惯
+const OPEN_KEY = "bjrobust:admin-menu-open";
+
+function readOpen(): Record<string, boolean> {
+	try {
+		const raw = localStorage.getItem(OPEN_KEY);
+		const v = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+		return v && typeof v === "object" ? v : {};
+	} catch {
+		return {};
+	}
+}
+
+function hitChild(m: MenuItem, pathname: string): boolean {
+	return Boolean(m.children?.some((ch) => pathname === ch.to || pathname.startsWith(`${ch.to}/`)));
+}
 
 export type AdminCtx = {
 	user: AdminUser;
@@ -55,6 +72,34 @@ export default function AdminLayout({
 	const location = useLocation();
 	const visible = MENUS.filter((m) => !m.superOnly || user.isSuper);
 
+	// 分组默认展开；进到某个分组的子页面时自动展开该分组（用户手动收起后仍尊重收起状态）
+	const [open, setOpen] = useState<Record<string, boolean>>(() => {
+		const initial = readOpen();
+		for (const m of MENUS) if (m.children && hitChild(m, location.pathname)) initial[m.to] = true;
+		return initial;
+	});
+
+	useEffect(() => {
+		const active = MENUS.filter((m) => m.children && hitChild(m, location.pathname)).map((m) => m.to);
+		if (!active.length) return;
+		setOpen((prev) => {
+			if (active.every((to) => prev[to])) return prev;
+			const next = { ...prev };
+			for (const to of active) next[to] = true;
+			localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+			return next;
+		});
+	}, [location.pathname]);
+
+	const toggle = (to: string) => {
+		setOpen((prev) => {
+			const next = { ...prev, [to]: !(prev[to] ?? false) };
+			// 只存显式收起的分组，未记录的默认展开
+			localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+			return next;
+		});
+	};
+
 	return (
 		<div className="admin-layout">
 			<aside className="admin-side">
@@ -79,26 +124,40 @@ export default function AdminLayout({
 					</div>
 				) : null}
 				<nav className="admin-nav">
-					{visible.map((m) =>
-						m.children ? (
-							<div key={m.to} className="admin-menu-group">
-								{/* 父项仅在精确命中时高亮（实际总会跳到子页），避免父子两项同时蓝底 */}
-								<NavLink to={m.to} className={`group-parent${location.pathname === m.to ? " on" : ""}`}>
+					{visible.map((m) => {
+						if (!m.children) {
+							return (
+								<NavLink key={m.to} to={m.to} className={({ isActive }) => (isActive ? "on" : "")}>
 									{m.label}
-									<span className="group-caret">▾</span>
 								</NavLink>
-								{m.children.map((ch) => (
-									<NavLink key={ch.to} to={ch.to} className={({ isActive }) => `admin-sub${isActive ? " on" : ""}`}>
-										{ch.label}
-									</NavLink>
-								))}
+							);
+						}
+						const active = hitChild(m, location.pathname);
+						const expanded = open[m.to] ?? true;
+						return (
+							<div key={m.to} className={`admin-menu-group${active ? " active" : ""}`}>
+								<button
+									type="button"
+									className={`group-parent${active ? " has-active" : ""}`}
+									aria-expanded={expanded}
+									title={expanded ? "收起子菜单" : "展开子菜单"}
+									onClick={() => toggle(m.to)}
+								>
+									<span className="group-label">{m.label}</span>
+									<span className={`group-caret${expanded ? " open" : ""}`}>▾</span>
+								</button>
+								{expanded ? (
+									<div className="admin-sub-wrap">
+										{m.children.map((ch) => (
+											<NavLink key={ch.to} to={ch.to} className={({ isActive }) => `admin-sub${isActive ? " on" : ""}`}>
+												{ch.label}
+											</NavLink>
+										))}
+									</div>
+								) : null}
 							</div>
-						) : (
-							<NavLink key={m.to} to={m.to} className={({ isActive }) => (isActive ? "on" : "")}>
-								{m.label}
-							</NavLink>
-						),
-					)}
+						);
+					})}
 					<NavLink to="/" className="admin-back">
 						← 返回前台
 					</NavLink>

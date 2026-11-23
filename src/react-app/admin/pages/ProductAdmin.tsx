@@ -1,8 +1,12 @@
-// 产品管理（t_products + t_protype + t_img）：分类筛选 + 列表 + 编辑弹框 + 图集弹框
+// 产品管理（t_products + t_img）：分类筛选 + 列表 + 图集弹框
+// 编辑/新增统一走整页表单（/admin/products/add 与 /admin/products/edit/:id 共用 ProductForm），
+// 这里不再维护第二套表单；分类的新增/改名/排序/删除全部收敛到「产品分类」页，避免两处入口互相打架。
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ImageField from "../components/ImageField";
 import { adminApi, type AdminProduct, type ProType } from "../api";
+
+const PAGE_SIZE = 20;
 
 export default function ProductAdmin() {
 	const [types, setTypes] = useState<ProType[]>([]);
@@ -11,12 +15,8 @@ export default function ProductAdmin() {
 	const [page, setPage] = useState(1);
 	const [total, setTotal] = useState(0);
 	const [items, setItems] = useState<AdminProduct[]>([]);
-	const [editing, setEditing] = useState<AdminProduct | null>(null);
 	const [imgFor, setImgFor] = useState<AdminProduct | null>(null);
-	const [newName, setNewName] = useState("");
-	const [newPid, setNewPid] = useState(0);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-	const [busy, setBusy] = useState(false);
 	const nav = useNavigate();
 
 	const flash = (ok: boolean, text: string) => {
@@ -53,24 +53,9 @@ export default function ProductAdmin() {
 
 	const typeOf = (id: number) => types.find((t) => t.id === id)?.name ?? (id ? `#${id}` : "未分类");
 
-	const saveProduct = async () => {
-		if (!editing) return;
-		setBusy(true);
-		try {
-			if (editing.id) {
-				await adminApi.updateProduct(editing.id, editing);
-				flash(true, "已保存");
-			} else {
-				await adminApi.addProduct(editing);
-				flash(true, "已添加");
-			}
-			setEditing(null);
-			await loadList();
-		} catch (e) {
-			flash(false, e instanceof Error ? e.message : "保存失败");
-		} finally {
-			setBusy(false);
-		}
+	const pickType = (id: number) => {
+		setTypeId(id);
+		setPage(1);
 	};
 
 	const remove = async (id: number) => {
@@ -84,94 +69,59 @@ export default function ProductAdmin() {
 		}
 	};
 
-	const addType = async () => {
-		if (!newName.trim()) return;
-		try {
-			await adminApi.addProductType({ name: newName.trim(), pid: newPid });
-			setNewName("");
-			setNewPid(0);
-			flash(true, "分类已添加");
-			await loadTypes();
-		} catch (e) {
-			flash(false, e instanceof Error ? e.message : "添加失败");
-		}
-	};
-
-	const delType = async (id: number) => {
-		if (!confirm("确定删除该分类？")) return;
-		try {
-			await adminApi.delProductType(id);
-			flash(true, "已删除");
-			await loadTypes();
-		} catch (e) {
-			flash(false, e instanceof Error ? e.message : "删除失败");
-		}
-	};
-
-	const pages = Math.max(Math.ceil(total / 20), 1);
+	const pages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+	const currentType = typeId ? types.find((t) => t.id === typeId) : null;
 
 	return (
 		<div>
 			<div className="admin-page-head">
 				<h2>产品列表</h2>
-				<button className="btn primary" onClick={() => nav("/admin/products/add")}>
-					+ 新增产品
-				</button>
+				<div className="admin-row" style={{ margin: 0 }}>
+					<Link className="btn" to="/admin/products/types">
+						分类管理
+					</Link>
+					<button className="btn primary" onClick={() => nav("/admin/products/add")}>
+						+ 新增产品
+					</button>
+				</div>
 			</div>
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
 
 			<div className="admin-panel">
-				<div className="admin-tabs">
-					<button className={typeId === 0 ? "on" : ""} onClick={() => { setTypeId(0); setPage(1); }}>
-						全部
-					</button>
-					{tree.map((t) => (
-						<span key={t.id} style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
-							<button className={typeId === t.id ? "on" : ""} onClick={() => { setTypeId(t.id); setPage(1); }}>
-								{t.name}
-							</button>
-							{(t.children ?? []).map((c) => (
-								<button
-									key={c.id}
-									className={typeId === c.id ? "on" : ""}
-									style={{ fontSize: 12 }}
-									onClick={() => { setTypeId(c.id); setPage(1); }}
-								>
-									{c.name}
-								</button>
-							))}
-						</span>
-					))}
-				</div>
-				<div className="admin-row">
-					<input
-						value={newName}
-						onChange={(e) => setNewName(e.target.value)}
-						placeholder="新分类名"
-						style={{ maxWidth: 180, padding: "7px 12px", border: "1px solid #e0e5ee", borderRadius: 8 }}
-					/>
-					<select
-						value={newPid}
-						onChange={(e) => setNewPid(Number(e.target.value))}
-						style={{ maxWidth: 160, padding: "7px 12px", border: "1px solid #e0e5ee", borderRadius: 8 }}
-					>
-						<option value={0}>作为顶级分类</option>
-						{tree.map((t) => (
-							<option key={t.id} value={t.id}>
-								作为 {t.name} 的子分类
-							</option>
-						))}
-					</select>
-					<button className="btn small" onClick={addType}>
-						添加分类
-					</button>
-					{typeId ? (
-						<button className="btn small danger" onClick={() => delType(typeId)}>
-							删除当前分类
+				<div className="type-filters">
+					<div className="type-row">
+						<button className={typeId === 0 ? "on" : ""} onClick={() => pickType(0)}>
+							全部产品（{typeId === 0 ? total : "—"}）
 						</button>
-					) : null}
+					</div>
+					{tree.map((t) => {
+						const children = t.children ?? [];
+						const childOn = children.some((c) => c.id === typeId);
+						return (
+							<div className="type-row" key={t.id}>
+								<button
+									className={`type-parent${typeId === t.id ? " on" : childOn ? " has-child-on" : ""}`}
+									title="选中父分类会包含其下所有子分类的产品"
+									onClick={() => pickType(t.id)}
+								>
+									{t.name}
+								</button>
+								{children.map((c) => (
+									<button key={c.id} className={typeId === c.id ? "on" : ""} onClick={() => pickType(c.id)}>
+										{c.name}
+									</button>
+								))}
+							</div>
+						);
+					})}
 				</div>
+				{currentType ? (
+					<div className="muted" style={{ fontSize: 12, marginTop: -6 }}>
+						当前筛选：{currentType.name}
+						{currentType.pid ? "（子分类）" : `（含 ${currentType.children?.length ?? 0} 个子分类）`}，共 {total} 件
+					</div>
+				) : null}
 			</div>
 
 			{items.length ? (
@@ -205,7 +155,7 @@ export default function ProductAdmin() {
 									<span className={`badge ${p.isShow ? "on" : "off"}`}>{p.isShow ? "显示" : "隐藏"}</span>
 								</td>
 								<td style={{ whiteSpace: "nowrap" }}>
-									<button className="btn small" onClick={() => setEditing({ ...p })}>
+									<button className="btn small" onClick={() => nav(`/admin/products/edit/${p.id}`)}>
 										编辑
 									</button>{" "}
 									<button className="btn small" onClick={() => setImgFor(p)}>
@@ -229,117 +179,11 @@ export default function ProductAdmin() {
 						上一页
 					</button>
 					<span className="muted">
-						{page} / {pages}
+						{page} / {pages}（共 {total} 件，每页 {PAGE_SIZE}）
 					</span>
 					<button disabled={page >= pages} onClick={() => setPage(page + 1)}>
 						下一页
 					</button>
-				</div>
-			) : null}
-
-			{editing ? (
-				<div className="modal-mask" onClick={() => !busy && setEditing(null)}>
-					<div className="modal" onClick={(e) => e.stopPropagation()}>
-						<h3>{editing.id ? `编辑 #${editing.id}` : "新增产品"}</h3>
-						<div className="admin-field">
-							<label>产品名</label>
-							<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} maxLength={200} />
-						</div>
-						<div className="admin-row">
-							<div className="admin-field">
-								<label>分类</label>
-								<select
-									value={editing.typeId}
-									onChange={(e) => setEditing({ ...editing, typeId: Number(e.target.value) })}
-								>
-									<option value={0}>未分类</option>
-									{types.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.level ? "　" : ""}
-											{t.name}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className="admin-field">
-								<label>排序（大靠前）</label>
-								<input
-									type="number"
-									value={editing.order}
-									onChange={(e) => setEditing({ ...editing, order: Number(e.target.value) })}
-								/>
-							</div>
-							<div className="admin-field">
-								<label>状态</label>
-								<select
-									value={editing.isShow}
-									onChange={(e) => setEditing({ ...editing, isShow: Number(e.target.value) })}
-								>
-									<option value={1}>显示</option>
-									<option value={0}>隐藏</option>
-								</select>
-							</div>
-							<div className="admin-field">
-								<label>首页推荐</label>
-								<select
-									value={editing.isCommend}
-									onChange={(e) => setEditing({ ...editing, isCommend: Number(e.target.value) })}
-								>
-									<option value={0}>否</option>
-									<option value={1}>是</option>
-								</select>
-							</div>
-						</div>
-						<ImageField
-							label="缩略图"
-							value={editing.smallPic}
-							onChange={(p) => setEditing({ ...editing, smallPic: p })}
-						/>
-						<div className="admin-row">
-							<div className="admin-field">
-								<label>编号（BH）</label>
-								<input value={editing.bh} onChange={(e) => setEditing({ ...editing, bh: e.target.value })} placeholder="产品编号" />
-							</div>
-							<div className="admin-field">
-								<label>标准（BZ）</label>
-								<input value={editing.bz} onChange={(e) => setEditing({ ...editing, bz: e.target.value })} placeholder="执行标准" />
-							</div>
-						</div>
-						<div className="admin-row">
-							<div className="admin-field">
-								<label>SEO 标题</label>
-								<input value={editing.webTitle} onChange={(e) => setEditing({ ...editing, webTitle: e.target.value })} />
-							</div>
-							<div className="admin-field">
-								<label>SEO 关键词</label>
-								<input value={editing.webKey} onChange={(e) => setEditing({ ...editing, webKey: e.target.value })} />
-							</div>
-						</div>
-						<div className="admin-field">
-							<label>SEO 描述</label>
-							<input value={editing.webDesc} onChange={(e) => setEditing({ ...editing, webDesc: e.target.value })} />
-						</div>
-						<div className="admin-field">
-							<label>正文（HTML）</label>
-							<textarea
-								value={editing.content}
-								onChange={(e) => setEditing({ ...editing, content: e.target.value })}
-								style={{ minHeight: 200 }}
-							/>
-						</div>
-						<div className="admin-field">
-							<label>备注</label>
-							<input value={editing.memo} onChange={(e) => setEditing({ ...editing, memo: e.target.value })} />
-						</div>
-						<div className="modal-foot">
-							<button className="btn" disabled={busy} onClick={() => setEditing(null)}>
-								取消
-							</button>
-							<button className="btn primary" disabled={busy} onClick={saveProduct}>
-								{busy ? "保存中…" : "保存"}
-							</button>
-						</div>
-					</div>
 				</div>
 			) : null}
 
@@ -348,7 +192,7 @@ export default function ProductAdmin() {
 	);
 }
 
-// ---- 图集管理弹框（t_img） ----
+// ---- 图集管理弹框（t_img）：一律走上传控件，不再手填路径 ----
 function ImageModal({
 	product,
 	onClose,
@@ -378,7 +222,7 @@ function ImageModal({
 
 	const add = async () => {
 		if (!pic.trim()) {
-			flash(false, "请填写图片路径");
+			flash(false, "请先选择图片");
 			return;
 		}
 		setBusy(true);
@@ -407,7 +251,7 @@ function ImageModal({
 	return (
 		<div className="modal-mask" onClick={onClose}>
 			<div className="modal" onClick={(e) => e.stopPropagation()}>
-				<h3>图集：{product.name}</h3>
+				<h3>图集：{product.name}（共 {imgs.length} 张）</h3>
 				<div className="upload-grid">
 					{imgs.map((im) => (
 						<div className="upload-item" key={im.id}>
@@ -422,17 +266,20 @@ function ImageModal({
 					))}
 					{!imgs.length ? <div className="empty-tip" style={{ gridColumn: "1/-1" }}>暂无图片</div> : null}
 				</div>
-				<div className="admin-row" style={{ marginTop: 16 }}>
+				<ImageField
+					label="新增图片"
+					value={pic}
+					onChange={setPic}
+					ratio="4 / 3"
+					hint="选图后上传到本站目录，再填写名称点「添加」"
+				/>
+				<div className="admin-row">
 					<div className="admin-field">
-						<label>图片路径（/assets 或 /upload 前缀均可）</label>
-						<input value={pic} onChange={(e) => setPic(e.target.value)} placeholder="bjrobust/upload/2026/11/23/xxx.jpg" />
+						<label>图片名称（可空）</label>
+						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="如图：表面振动压实仪" />
 					</div>
-					<div className="admin-field">
-						<label>名称</label>
-						<input value={name} onChange={(e) => setName(e.target.value)} />
-					</div>
-					<button className="btn primary" disabled={busy} onClick={add}>
-						添加
+					<button className="btn primary" disabled={busy || !pic} onClick={add}>
+						{busy ? "添加中…" : "添加"}
 					</button>
 				</div>
 				<div className="modal-foot">

@@ -1,6 +1,7 @@
-// 产品添加（对应旧后台"产品添加"独立页）：整页表单，保存后跳回产品列表
+// 产品新增 / 编辑共用整页表单：/admin/products/add 与 /admin/products/edit/:id 都是它
+// 之前新增在整页组件里、编辑在列表页的 modal 里各写一遍字段，容易漂移，这里合成一套。
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ImageField from "../components/ImageField";
 import { adminApi, type AdminProduct, type ProType } from "../api";
 
@@ -23,12 +24,16 @@ const EMPTY: AdminProduct = {
 	bz: "",
 };
 
-export default function ProductAdd() {
+export default function ProductForm() {
 	const nav = useNavigate();
+	const params = useParams();
+	const editId = Number(params.id ?? 0);
+	const isEdit = editId > 0;
 	const [form, setForm] = useState<AdminProduct>(EMPTY);
 	const [types, setTypes] = useState<ProType[]>([]);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [loading, setLoading] = useState(isEdit);
 
 	useEffect(() => {
 		adminApi
@@ -36,6 +41,16 @@ export default function ProductAdd() {
 			.then((d) => setTypes(d.items))
 			.catch(() => {});
 	}, []);
+
+	useEffect(() => {
+		if (!isEdit) return;
+		setLoading(true);
+		adminApi
+			.getProduct(editId)
+			.then((d) => setForm({ ...EMPTY, ...d.product }))
+			.catch((e) => setMsg({ ok: false, text: e instanceof Error ? e.message : "加载产品失败" }))
+			.finally(() => setLoading(false));
+	}, [editId, isEdit]);
 
 	const set = (k: keyof AdminProduct, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -46,8 +61,13 @@ export default function ProductAdd() {
 		}
 		setBusy(true);
 		try {
-			const d = await adminApi.addProduct(form);
-			setMsg({ ok: true, text: `产品已保存（ID ${d.id}）` });
+			if (isEdit) {
+				await adminApi.updateProduct(editId, form);
+				setMsg({ ok: true, text: "已保存" });
+			} else {
+				const d = await adminApi.addProduct(form);
+				setMsg({ ok: true, text: `产品已保存（ID ${d.id}）` });
+			}
 			setTimeout(() => nav("/admin/products/list"), 800);
 		} catch (e) {
 			setMsg({ ok: false, text: e instanceof Error ? e.message : "保存失败" });
@@ -59,7 +79,7 @@ export default function ProductAdd() {
 	return (
 		<div>
 			<div className="admin-page-head">
-				<h2>产品添加</h2>
+				<h2>{isEdit ? `编辑产品 #${editId}` : "产品添加"}</h2>
 			</div>
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
@@ -68,6 +88,7 @@ export default function ProductAdd() {
 				className="admin-panel"
 				style={{ maxWidth: 860, display: "flex", flexDirection: "column", gap: 12, padding: 18 }}
 			>
+				{loading ? <div className="empty-tip">加载中…</div> : null}
 				<div className="admin-field">
 					<label>产品名 *</label>
 					<input value={form.name} onChange={(e) => set("name", e.target.value)} maxLength={200} />
@@ -137,6 +158,9 @@ export default function ProductAdd() {
 				<div className="admin-field">
 					<label>正文（HTML）</label>
 					<textarea value={form.content} onChange={(e) => set("content", e.target.value)} style={{ minHeight: 200 }} />
+					<div className="muted" style={{ fontSize: 12 }}>
+						图片请用完整上传后的 /assets 路径；保存时后端会自动把外链图片搬到本站目录。
+					</div>
 				</div>
 				<div className="admin-field">
 					<label>备注</label>
@@ -146,8 +170,8 @@ export default function ProductAdd() {
 					<button className="btn" onClick={() => nav("/admin/products/list")}>
 						取消
 					</button>
-					<button className="btn primary" disabled={busy} onClick={save}>
-						{busy ? "保存中…" : "保存产品"}
+					<button className="btn primary" disabled={busy || loading} onClick={save}>
+						{busy ? "保存中…" : isEdit ? "保存修改" : "保存产品"}
 					</button>
 				</div>
 			</div>

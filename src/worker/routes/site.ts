@@ -10,6 +10,7 @@ import { nowSql } from "../lib/auth";
 import { exec, rows } from "../lib/d1";
 import { publicSlides } from "../lib/slide";
 import { assetCandidates, cacheControlFor, legacyEnabled } from "../lib/storage";
+import { expandTypeIds, inClause } from "../lib/protype";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -238,8 +239,10 @@ app.get("/products", async (c) => {
 	const where: string[] = ["SiteId = ?", "IsShow = 1"];
 	const params: (string | number)[] = [siteId];
 	if (typeId) {
-		where.push("TypeID = ?");
-		params.push(Number(typeId));
+		// 前台同理：选父分类要列出所有子分类的产品
+		const ids = await expandTypeIds(c.env, siteId, Number(typeId));
+		where.push(`TypeID ${inClause(ids)}`);
+		params.push(...ids);
 	}
 	if (bh) {
 		where.push("BH LIKE ?");

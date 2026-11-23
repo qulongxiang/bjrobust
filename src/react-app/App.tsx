@@ -8,7 +8,7 @@ import AdminApp, { AdminLogin } from "./admin/AdminApp";
 import StatsAdmin from "./admin/pages/StatsAdmin";
 import NewsAdmin from "./admin/pages/NewsAdmin";
 import ProductAdmin from "./admin/pages/ProductAdmin";
-import ProductAdd from "./admin/pages/ProductAdd";
+import ProductForm from "./admin/pages/ProductForm";
 import ProductsTypes from "./admin/pages/ProductsTypes";
 import FeedbackAdmin from "./admin/pages/FeedbackAdmin";
 import SiteAdmin from "./admin/pages/SiteAdmin";
@@ -40,7 +40,8 @@ export default function App() {
 					<Route path="products" element={<Outlet />}>
 						<Route index element={<Navigate to="/admin/products/list" replace />} />
 						<Route path="list" element={<ProductAdmin />} />
-						<Route path="add" element={<ProductAdd />} />
+						<Route path="add" element={<ProductForm />} />
+						<Route path="edit/:id" element={<ProductForm />} />
 						<Route path="types" element={<ProductsTypes />} />
 					</Route>
 					<Route path="feedback" element={<FeedbackAdmin />} />

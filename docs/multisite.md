@@ -209,7 +209,13 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 临时降级：把 `DB_GUARD` 改成 `warn` 重新部署即可；但降级期间等于护栏失效，改完应尽快恢复。
 - 已知设计边界：护栏是**词法级**的（正则认 `from/into/update/join t_xxx`），挡得住"忘了写条件"，挡不住"写了 `SiteId` 但值是别的站"——后者靠路由层的 `site` 上下文取值，仍属约定，只是把最容易犯的错变成了硬错误。
 
-## 6.7 schema 版本与回归
+## 6.7 产品分类筛选：父分类要含子分类
+- `t_protype` 是两级树，产品只挂在子分类上（父分类 `PID=0` 只做分组，几乎没有产品直挂）。
+- 因此前后台的产品列表按 `typeId` 过滤时都必须把父分类展开成「父 + 子」，规则收在 `src/worker/lib/protype.ts`（`expandTypeIds` + `inClause`），`routes/admin-products.ts` 与 `routes/site.ts` 共用。
+- 之前两边都是 `TypeID = ?` 精确匹配，点「进口实验仪器类」这类父分类必然空列表——这是数据+SQL 共同造成的真缺陷，不是数据没录。
+- 后台「产品分类」页的排序是 `OrderBy` 升序（小在前），与产品列表的 `OrderBy DESC` 相反，文案已按实际行为标注，别照着产品列表的直觉改 SQL 顺序（会打乱前台导航）。
+
+## 6.8 schema 版本与回归
 
 - `migrations/0001_baseline.sql` 是全库基线（从线上 `sqlite_master` 导出，40 张表 + 39 个索引，全部 `IF NOT EXISTS`，可重复执行），新环境直接跑这一份就能起库。
 - `tools/db_migrate.mjs`：`status` 看哪些已应用，`apply` 按文件名顺序执行未应用的迁移，成功后在 `t_migrations` 记账（失败不记账，改完重跑）。支持 `--local`（本地 D1）与 `--upto`。

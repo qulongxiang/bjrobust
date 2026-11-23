@@ -84,6 +84,20 @@ export default function ProductsTypes() {
 		}
 	};
 
+	// 分类排序是升序（OrderBy 小在前），与产品列表相反；之前文案写成"大在前"，误导
+	const toggleShow = async (t: ProType) => {
+		setBusy(true);
+		try {
+			await adminApi.updateProductType(t.id, { isShow: t.isShow ? 0 : 1 });
+			flash(true, t.isShow ? `「${t.name}」已隐藏` : `「${t.name}」已显示`);
+			await load();
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "切换失败");
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	return (
 		<div>
 			<div className="admin-page-head">
@@ -92,32 +106,34 @@ export default function ProductsTypes() {
 
 			{msg ? <div className={`admin-msg ${msg.ok ? "ok" : "err"}`}>{msg.text}</div> : null}
 
-			<div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-				<input
-					value={newName}
-					onChange={(e) => setNewName(e.target.value)}
-					placeholder="分类名"
-					style={{ width: 200 }}
-				/>
-				<select value={newPid} onChange={(e) => setNewPid(Number(e.target.value))} style={{ minWidth: 160 }}>
-					<option value={0}>顶级分类</option>
-					{items.map((t) => (
-						<option key={t.id} value={t.id}>
-							{t.pid ? `${nameOf(t.pid)} / ` : ""}
-							{t.name}
-						</option>
-					))}
-				</select>
-				<input
-					type="number"
-					value={newOrder}
-					onChange={(e) => setNewOrder(Number(e.target.value) || 0)}
-					placeholder="排序（大在前）"
-					style={{ width: 130 }}
-				/>
-				<button className="btn primary" disabled={busy || !newName.trim()} onClick={add}>
-					+ 添加分类
-				</button>
+			<div className="admin-panel" style={{ marginBottom: 14 }}>
+				<div className="admin-row">
+					<div className="admin-field">
+						<label>分类名</label>
+						<input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="如：土工类 SOIL" />
+					</div>
+					<div className="admin-field">
+						<label>上级分类</label>
+						<select value={newPid} onChange={(e) => setNewPid(Number(e.target.value))}>
+							<option value={0}>顶级分类</option>
+							{items.map((t) => (
+								<option key={t.id} value={t.id}>
+									{t.pid ? `${nameOf(t.pid)} / ` : ""}
+									{t.name}
+								</option>
+							))}
+						</select>
+					</div>
+					<div className="admin-field" style={{ flex: "0 0 130px", minWidth: 120 }}>
+						<label>排序（小在前）</label>
+						<input type="number" value={newOrder} onChange={(e) => setNewOrder(Number(e.target.value) || 0)} />
+					</div>
+					<div className="admin-field" style={{ flex: "0 0 auto", minWidth: 0, alignSelf: "flex-end" }}>
+						<button className="btn primary" disabled={busy || !newName.trim()} onClick={add}>
+							+ 添加分类
+						</button>
+					</div>
+				</div>
 			</div>
 
 			{items.length ? (
@@ -156,20 +172,34 @@ export default function ProductsTypes() {
 										<span className="muted">{t.order}</span>
 									)}
 								</td>
-								<td className="muted">{t.isShow ? "显示" : "隐藏"}</td>
+								<td>
+									<button
+										className={`badge ${t.isShow ? "on" : "off"}`}
+										style={{ border: 0, cursor: "pointer" }}
+										disabled={busy}
+										title={t.isShow ? "点击隐藏该分类" : "点击显示该分类"}
+										onClick={() => toggleShow(t)}
+									>
+										{t.isShow ? "显示" : "隐藏"}
+									</button>
+								</td>
 								<td>
 									{editId === t.id ? (
 										<>
-											<button disabled={busy} onClick={saveEdit}>
+											<button className="btn small" disabled={busy} onClick={saveEdit}>
 												保存
+											</button>{" "}
+											<button className="btn small" onClick={() => setEditId(0)}>
+												取消
 											</button>
-											<button onClick={() => setEditId(0)}>取消</button>
 										</>
 									) : (
 										<>
-											<button onClick={() => startEdit(t)}>编辑</button>
+											<button className="btn small" onClick={() => startEdit(t)}>
+												编辑
+											</button>{" "}
 											<button
-												className="danger"
+												className="btn small danger"
 												disabled={hasChildren(t.id)}
 												title={hasChildren(t.id) ? "该分类下有子分类，不能删除" : ""}
 												onClick={() => remove(t.id)}

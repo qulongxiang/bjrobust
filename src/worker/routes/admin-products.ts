@@ -4,6 +4,7 @@ import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
 import { normalizeContentImages } from "../lib/content";
+import { expandTypeIds, inClause } from "../lib/protype";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -41,8 +42,10 @@ app.get("/products", async (c) => {
 	const where: string[] = ['"SiteId" = ?'];
 	const params: (string | number)[] = [siteId];
 	if (typeId) {
-		where.push("TypeID = ?");
-		params.push(Number(typeId));
+		// 父分类要含子分类的货：产品都挂在子分类上，只按 TypeID = 父 过滤会得到空列表
+		const ids = await expandTypeIds(c.env, siteId, Number(typeId));
+		where.push(`TypeID ${inClause(ids)}`);
+		params.push(...ids);
 	}
 	const whereSql = "WHERE " + where.join(" AND ");
 	const total = await count(db.prepare(`SELECT COUNT(*) AS n FROM t_products ${whereSql}`).bind(...params));
@@ -52,6 +55,14 @@ app.get("/products", async (c) => {
 			.bind(...params, size, (page - 1) * size),
 	);
 	return c.json({ ok: true, total, page, pageSize: size, items: list.map(pick) });
+});
+
+app.get("/products/:id", async (c) => {
+	const row = await c.env.DB.prepare(`SELECT ${PRO_FIELDS} FROM t_products WHERE "SiteId" = ? AND id = ?`)
+		.bind(c.get("siteId"), Number(c.req.param("id")))
+		.first();
+	if (!row) return c.json({ error: "产品不存在" }, 404);
+	return c.json({ ok: true, product: pick(row) });
 });
 
 app.post("/products", async (c) => {

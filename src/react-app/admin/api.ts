@@ -213,6 +213,7 @@ export const adminApi = {
 	updateProduct: (id: number, b: Partial<AdminProduct>) =>
 		req<{ ok: boolean }>(`/api/admin/products/${id}`, { method: "PUT", body: j(b) }),
 	delProduct: (id: number) => req<{ ok: boolean }>(`/api/admin/products/${id}`, { method: "DELETE" }),
+	getProduct: (id: number) => req<{ ok: boolean; product: AdminProduct }>(`/api/admin/products/${id}`),
 
 	productImages: (id: number) =>
 		req<{ ok: boolean; items: { id: number; name: string; pic: string; big: string; order: number; isShow: number }[] }>(
