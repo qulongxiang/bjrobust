@@ -1,6 +1,6 @@
 // 后台：图片上传到 R2
-// 分站存储：新图走 upload/<站点Code>/、内页头图走 cn-banner/<站点Code>/
-// bjrobust 的历史图片仍在 upload/、cn-banner/ 老前缀下，读取时由 /assets 路由回退兼容
+// 分站存储：新图走 upload/<站点Code>/<年>/<月>/<日>/<文件名>，内页头图走 cn-banner/<站点Code>/
+// bjrobust 的历史图片已迁到 upload/bjrobust/<年>/<月>/<日>/，读取由 /assets 精确命中
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { isBannerPage, readBannerEntries, saveBannerFile, setBannerPic } from "../lib/banner";
@@ -9,6 +9,13 @@ import { ALLOWED_EXT, MAX_SIZE, sniffImage } from "../lib/upload";
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
 const R2_OFF_HINT = "R2 未开通：请先在 Cloudflare 控制台开通 R2、创建桶并恢复 wrangler.json 绑定";
+
+/** 北京时间（与老 PHP 站一致），给出 y/m/d 供目录使用 */
+function todayPath(): { y: string; m: string; d: string } {
+	const bj = new Date(Date.now() + 8 * 3600 * 1000);
+	const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+	return { y: String(bj.getUTCFullYear()), m: pad(bj.getUTCMonth() + 1), d: pad(bj.getUTCDate()) };
+}
 
 function uploadPrefix(siteCode: string): string {
 	return `upload/${siteCode}/`;
@@ -41,7 +48,8 @@ app.post("/upload", async (c) => {
 	if (!sniffed || sniffed !== declared) return c.json({ error: "文件内容与图片格式不符" }, 400);
 
 	const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-	const key = `${uploadPrefix(site.code)}${name}`;
+	const { y, m, d } = todayPath();
+	const key = `${uploadPrefix(site.code)}${y}/${m}/${d}/${name}`;
 	await c.env.IMAGES.put(key, file.stream(), {
 		httpMetadata: { contentType: declared },
 	});

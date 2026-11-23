@@ -1,16 +1,27 @@
 // R2 最小结构类型（R2 未开通期间 wrangler.json 无 IMAGES 绑定；
 // 开通后恢复绑定 + npx wrangler types，即可用生成的 R2Bucket 类型替换）
+export type R2ObjectLike = {
+	key: string;
+	size: number;
+	uploaded?: Date | string;
+	httpMetadata?: { contentType?: string };
+	customMetadata?: Record<string, string>;
+	body: ReadableStream;
+};
+
 export type R2BucketLike = {
-	get(key: string): Promise<{ body: ReadableStream; httpMetadata?: { contentType?: string } } | null>;
+	get(key: string): Promise<R2ObjectLike | null>;
 	put(
 		key: string,
 		value: ReadableStream | ArrayBuffer | ArrayBufferView | string,
-		options?: { httpMetadata?: { contentType?: string } },
+		options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> },
 	): Promise<unknown>;
-	list(options?: { prefix?: string; limit?: number }): Promise<{
-		objects: { key: string; size: number; uploaded: unknown }[];
+	list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
+		objects: { key: string; size: number; uploaded?: Date | string }[];
+		truncated?: boolean;
+		cursor?: string;
 	}>;
-	head(key: string): Promise<{ size: number; uploaded: unknown } | null>;
+	head(key: string): Promise<{ size: number; uploaded?: Date | string } | null>;
 	delete(key: string | string[]): Promise<void>;
 };
 
@@ -19,6 +30,8 @@ export type AppEnv = Env & {
 	JWT_SECRET: string;
 	/** R2 未开通时为 undefined：图片接口 404、上传接口 503 */
 	IMAGES?: R2BucketLike;
+	/** 一次性维护令牌：只有设置了才允许用 X-Maint-Token 走维护接口（用完删掉） */
+	MAINT_TOKEN?: string;
 	/** 未知域名回落到哪个站点 Code（默认 bjrobust） */
 	SITE_DEFAULT?: string;
 	/** 本地开发用：JSON {"localhost:5173":"bjrobust"}，把 Host 硬映射到站点 */

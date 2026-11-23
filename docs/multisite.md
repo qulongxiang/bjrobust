@@ -27,7 +27,7 @@
 
 其它约定：
 
-- 图片按站点分前缀：`upload/<code>/...`、`cn-banner/<code>/`。老图仍在 `upload/`、`cn-banner/` 根下，只有 `bjrobust` 会回退到这些旧路径，新站点不会串图。
+- 图片按站点分目录，且再按日期分层：`upload/<code>/<YYYY>/<MM>/<DD>/<文件名>`（普通图片）、`cn-banner/<code>/<YYYY>/<MM>/<DD>/<文件名>`（内页头图）。bjrobust 的历史图片已全部迁到这个结构下（详见 6.5），新站点不会串图。
 - 内页头图（公司概况/产品中心/新闻资讯/成功案例/技术支持/联系我们）是**按站点逐页配置**的：`t_banner` 里 `SiteId + Page` 唯一，图片键写在 `Pic`。
   - 后台「站点设置 → 内页头图」可以逐页上传替换，也可以「清除」让该页退回主题色渐变；
   - 上传的新图落到 `cn-banner/<code>/<page>.<ext>`，不会覆盖别站、也不会覆盖 bjrobust 的历史文件名；
@@ -162,6 +162,20 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 用户管理：超管建号可指定所属站点（"平台级（超管）"或任一站点）；站点管理员建号强制落本站，显式传 `siteId:0` 返回 403。
 - 重置密码/锁定：本人可改自己，本站账号可改，平台级账号只有超管能改，跨站必须切站。
 - 角色串不再从建号人复制，按站点写死（`0/平台超管` 或 `1/站点管理员`）。早期版本复制角色串会把 `admin` 串带到新账号，导致站点管理员被误判成超管（已修）。
+
+## 6.5 图片目录规范：站点 / 年 / 月 / 日
+
+- 规范：`upload/<站点Code>/<YYYY>/<MM>/<DD>/<文件名>`，内页头图同规则但根为 `cn-banner/`。文件名在新上传时是 `<毫秒时间戳>-<随机6位><扩展名>`；历史图沿用原名（老 PHP 的 `YYYYMMDD...` 命名天然带日期）。
+- 日期口径：文件名以 `YYYYMMDD` 开头就用文件名里的日期；否则用 R2 对象的 `uploaded` 时间转 +08:00。前台读取始终是 `/assets/<key>`，按 key 精确命中，不做任何"猜路径"的回退。
+- 新上传（`src/worker/routes/admin-upload.ts`）：`todayPath()` 取北京时间给出 `y/m/d`，key = `upload/<code>/<y>/<m>/<d>/<时间戳-随机><ext>`；`isDeletable()` 只允许删本站前缀（bjrobust 额外兜底老的 `upload/<文件名>` 单层 key）。
+- 历史搬迁接口：`POST /api/maint/storage/migrate`（独立前缀，只认 header `X-Maint-Token`，与 `env.MAINT_TOKEN` 比对，无 token 一律 403）。
+  - 参数：`{dry, purge, limit, after, dbOnly, prefix, match}`
+    - `dry:true` 只出计划（`legacyCount` / `queuedAfter` / `samples`；带 `match` 时返回 `matched` 明细，用于按文件名反查新旧 key）
+    - `after` 是按 `oldKey` 排序的游标，用来分批（一次 `limit` 条，返回的 `remaining` 降到 0 即搬完）
+    - `purge:true` 复制完顺带删旧 key；`dbOnly:true` 只改库不动 R2
+  - 流程：列举 R2 → 跳过首段已是站点 Code 的 key → 按规则生成新 key（重名加 `-2`）→ head 命中则跳过 → get/put 复制（写 `movedFrom` 元数据）→ 批量改库（`Content` 用 `REPLACE` + `instr(...)>0`，列值做裸名与旧 key双重替换）→ 可选 purge。
+- 线上现状（2026-11-23）：bjrobust 553 个历史对象已全部复制到 `upload/bjrobust/<Y>/<M>/<D>/` 与 `cn-banner/bjrobust/2026/11/13/`，库内引用已改写。全库 215 个唯一图片引用线上 HEAD 校验 213 个 200；剩余 2 个是 `t_img` 的历史死链（`4e934105…jpg`、`7ee9eb9f…jpg`），R2 与本地源目录都没有实体文件，迁移前就是 404。
+- 迁移令牌用完即弃：`npx wrangler secret delete MAINT_TOKEN` + 删本地 `.maint_token`；接口路由本身可以长期保留，靠 token 控制。
 
 ## 7. 已知限制（后续可做）
 

@@ -10,6 +10,7 @@ import adminContent from "./routes/admin-content";
 import adminProducts from "./routes/admin-products";
 import adminMisc from "./routes/admin-misc";
 import adminUpload from "./routes/admin-upload";
+import adminStorage, { migrateHandler } from "./routes/admin-storage";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -40,6 +41,9 @@ app.get("/api/", (c) =>
 	c.json({ name: "bjrobust", ok: true, site: c.get("site").code }),
 );
 app.route("/api/admin", adminAuth);
+// 运维工具：自带令牌鉴权，不走后台 session/CSRF
+app.post("/api/maint/storage/migrate", migrateHandler);
+app.route("/api/maint", adminStorage);
 app.route("/api/site", site);
 app.route("/assets", assetsApp);
 
