@@ -234,6 +234,8 @@ export default function PlatformAdmin() {
 				</table>
 			</div>
 
+			<BannerMatrix onMsg={flash} />
+
 			{editing ? (
 				<div className="modal-mask" onClick={() => !busy && setEditing(null)}>
 					<div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
@@ -356,6 +358,138 @@ export default function PlatformAdmin() {
 					</div>
 				</div>
 			) : null}
+		</div>
+	);
+}
+
+/** 跨站头图矩阵：行=菜单页，列=站点；一次看全 3 个平台每页的头图，可直接上传/清除 */
+function BannerMatrix({ onMsg }: { onMsg: (ok: boolean, text: string) => void }) {
+	type Cell = { pic: string; url: string; updated: string };
+	const [data, setData] = useState<{
+		pages: { page: string; label: string }[];
+		sites: { code: string; name: string; isActive: number }[];
+		matrix: Record<string, Record<string, Cell>>;
+	} | null>(null);
+	const [busyKey, setBusyKey] = useState("");
+
+	const loadBanners = () =>
+		adminApi
+			.platformBanners()
+			.then((d) => setData({ pages: d.pages, sites: d.sites, matrix: d.matrix }))
+			.catch((e) => onMsg(false, e instanceof Error ? e.message : "头图加载失败"));
+
+	useEffect(() => {
+		loadBanners();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	const upload = async (code: string, page: string, file?: File | null) => {
+		if (!file) return;
+		const key = `${code}/${page}`;
+		setBusyKey(key);
+		try {
+			await adminApi.uploadPlatformBanner(code, page, file);
+			onMsg(true, `已更新 ${code} / ${page} 头图`);
+			await loadBanners();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "上传失败");
+		} finally {
+			setBusyKey("");
+		}
+	};
+
+	const clear = async (code: string, page: string) => {
+		if (!confirm(`清除 ${code} 的「${page}」头图？清除后该站该页不再显示 banner 区域。`)) return;
+		const key = `${code}/${page}`;
+		setBusyKey(key);
+		try {
+			await adminApi.clearPlatformBanner(code, page);
+			onMsg(true, `已清除 ${code} / ${page} 头图`);
+			await loadBanners();
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "清除失败");
+		} finally {
+			setBusyKey("");
+		}
+	};
+
+	return (
+		<div className="admin-panel">
+			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+				<h3 style={{ margin: 0 }}>内页头图（跨站点统一维护）</h3>
+				<span className="muted" style={{ fontSize: 12 }}>
+					每格 = 一个站点的某个菜单页；留空的页面前台不渲染 banner
+				</span>
+			</div>
+			<div className="banner-matrix">
+				<table className="admin-table">
+					<thead>
+						<tr>
+							<th style={{ width: 120 }}>菜单页</th>
+							{(data?.sites ?? []).map((s) => (
+								<th key={s.code}>
+									{s.name || s.code}
+									<div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>
+										{s.code}
+										{s.isActive === 1 ? "" : "（停用）"}
+									</div>
+								</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						{(data?.pages ?? []).map((p) => (
+							<tr key={p.page}>
+								<td>
+									<b>{p.label}</b>
+									<div className="muted" style={{ fontSize: 12 }}>{p.page}</div>
+								</td>
+								{(data?.sites ?? []).map((s) => {
+									const cell = data?.matrix?.[s.code]?.[p.page];
+									const key = `${s.code}/${p.page}`;
+									const busy = busyKey === key;
+									return (
+										<td key={s.code}>
+											<div className="banner-cell">
+												<div className="banner-thumb">
+													{cell?.pic ? <img src={cell.url} alt="" /> : <span className="muted">未维护</span>}
+												</div>
+												<div className="banner-ops">
+													<label className={`btn small${busy ? " disabled" : ""}`}>
+														{busy ? "处理中…" : cell?.pic ? "替换" : "上传"}
+														<input
+															type="file"
+															accept="image/jpeg,image/png,image/gif,image/webp"
+															hidden
+															disabled={busy}
+															onChange={(e) => {
+																upload(s.code, p.page, e.target.files?.[0]);
+																e.currentTarget.value = "";
+															}}
+														/>
+													</label>
+													{cell?.pic ? (
+														<button className="btn small danger" disabled={busy} onClick={() => clear(s.code, p.page)}>
+															清除
+														</button>
+													) : null}
+												</div>
+											</div>
+										</td>
+									);
+								})}
+							</tr>
+						))}
+						{!data?.pages?.length ? (
+							<tr>
+								<td colSpan={4} className="empty-tip">
+									加载中…
+								</td>
+							</tr>
+						) : null}
+					</tbody>
+				</table>
+			</div>
 		</div>
 	);
 }

@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { AppEnv, AdminVariables } from "../env";
 import { isSuper, nowSql } from "../lib/auth";
+import { BANNER_PAGES, isBannerPage, readBannerEntries, saveBannerFile, setBannerPic } from "../lib/banner";
 import { count, exec, rows } from "../lib/d1";
 import { hasContent, scaffoldSite } from "../lib/scaffold";
 import { normalizeHost, siteByCode } from "../lib/tenant";
@@ -248,12 +249,62 @@ app.delete("/platform/sites/:id", async (c) => {
 	if (has && c.req.query("force") !== "1") {
 		return c.json({ error: "该站点已有内容，确认删除请带 force=1" }, 400);
 	}
-	for (const t of ["t_news", "t_products", "t_protype", "t_img", "t_content", "t_global", "t_feedback", "t_log"]) {
+	for (const t of ["t_news", "t_products", "t_protype", "t_img", "t_content", "t_global", "t_feedback", "t_log", "t_banner"]) {
 		await exec(env.DB.prepare(`DELETE FROM ${t} WHERE "SiteId" = ?`), id);
 	}
 	await exec(env.DB.prepare('DELETE FROM t_site_domain WHERE "SiteId" = ?'), id);
 	await exec(env.DB.prepare('DELETE FROM t_sites WHERE "id" = ?'), id);
 	return c.json({ ok: true });
+});
+
+// ---- 跨站点头图矩阵：一次看全所有站点 × 所有页面 ----
+app.get("/platform/banners", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const env = c.env;
+	const sites = await rows(env.DB.prepare('SELECT "id", "Code", "Name", "IsActive" FROM t_sites ORDER BY "Sort", "id"'));
+	const matrix: Record<string, Record<string, { pic: string; url: string; updated: string }>> = {};
+	for (const s of sites) {
+		const code = String(s.Code ?? "");
+		const entries = await readBannerEntries(env, Number(s.id));
+		matrix[code] = Object.fromEntries(entries.map((e) => [e.page, { pic: e.pic, url: e.url, updated: e.updated }]));
+	}
+	return c.json({
+		ok: true,
+		pages: BANNER_PAGES,
+		sites: sites.map((s) => ({
+			code: String(s.Code ?? ""),
+			name: String(s.Name ?? ""),
+			isActive: Number(s.IsActive ?? 0),
+		})),
+		matrix,
+	});
+});
+
+app.put("/platform/banners/:code/:page", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const code = c.req.param("code").toLowerCase();
+	const page = c.req.param("page");
+	if (!isBannerPage(page)) return c.json({ error: "未知头图页面" }, 400);
+	const site = await siteByCode(c.env, code);
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	const form = await c.req.formData().catch(() => null);
+	if (!form) return c.json({ error: "请求格式错误" }, 400);
+	const file = form.get("file");
+	if (!(file instanceof File)) return c.json({ error: "缺少 file 字段" }, 400);
+	const res = await saveBannerFile(c.env, site, page, file);
+	if (!res.ok) return c.json({ error: res.error }, res.status as 400 | 503);
+	return c.json({ ok: true, code, page, pic: res.pic });
+});
+
+app.delete("/platform/banners/:code/:page", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const code = c.req.param("code").toLowerCase();
+	const page = c.req.param("page");
+	if (!isBannerPage(page)) return c.json({ error: "未知头图页面" }, 400);
+	const site = await siteByCode(c.env, code);
+	if (!site) return c.json({ error: "站点不存在" }, 404);
+	await setBannerPic(c.env, site.id, page, "");
+	return c.json({ ok: true, code, page });
 });
 
 export default app;

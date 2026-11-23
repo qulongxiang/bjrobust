@@ -117,7 +117,18 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 写请求不带 `X-CSRF: 1` 必须 403；
 - `PUT /api/admin/site-meta` 只改当前生效站点那一行。
 
-## 6. 已知限制（后续可做）
+## 6. 内页头图（banner）与跨站统一维护
+
+- 数据：`t_banner` 每站每页一行（`SiteId + Page` 唯一），字段 `Pic` 存 R2 键；`Pic` 为空即"该页不配图"。
+- 页面键固定 6 个（顺序即菜单顺序）：`about` 公司概况、`products` 产品中心、`news` 新闻资讯、`cases` 成功案例、`support` 技术支持、`contact` 联系我们。
+- 上传落 `cn-banner/<站点Code>/<page>.<扩展名>`；替换同一页会覆盖同名对象；只校验文件头（jpg/png/gif/webp），单文件上限 5MB。
+- 前台：`GET /api/site/banners` 一次返回本站所有页面图，`PageHero` 按 `page` 取图；**取不到图时整块 banner 区域不渲染**（不会留渐变占位），页面直接从标题栏开始。
+- 后台本站维护：`/admin/site` 的"内页头图"面板（`GET/PUT/DELETE /api/admin/banners[/:page]`），操作的是"当前生效站点"。
+- 后台跨站维护（超管）：`/admin/platform` 的"内页头图（跨站点统一维护）"矩阵，行=6 个菜单页、列=所有站点，每格可上传/替换/清除，一眼看出哪站哪页还没配图。接口 `GET /api/admin/platform/banners`（返回 `pages / sites / matrix`）、`PUT|DELETE /api/admin/platform/banners/:code/:page`，非超管一律 403。
+- 清除只把 `Pic` 置空，不删 R2 对象，误删可凭文件名重传。
+- 站点管理员在自己的 `站点设置` 里改本站；超管在平台矩阵里一次改三家，二者读写同一张表，不会出现两套数据。
+
+## 7. 已知限制（后续可做）
 
 - 前端产物是全站共用的一份（主题色/品牌走数据库，文案走 `t_content`）。如果以后某家要完全不同的版式，需要按站点追加独立页面组件。
 - `public/` 里打进产物的静态图（如 `cn-images/logo-di.jpg`）是三站共享的同一份文件；站点专属图片请走后台上传到 R2（会自动落到 `upload/<code>/`）。
@@ -125,7 +136,7 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - 站点级管理员目前不限制菜单，只限制数据范围；要更细的权限，可在 `AdminLayout` 里按 `isSuper` 隐藏菜单并在后端逐个校验。
 - 没有站点级独立域名证书管理逻辑，证书由 Cloudflare Custom Domain 自动签发。
 
-## 7. 变更后的上线验证清单
+## 8. 变更后的上线验证清单
 
 ```powershell
 Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/site-info   # code=bjrobust
@@ -133,7 +144,9 @@ Invoke-RestMethod https://aaaa.qlxtools.asia/api/site/site-info       # code=aaa
 Invoke-RestMethod https://bbbb.qlxtools.asia/api/site/site-info       # code=bbbb
 Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/news?page=1&size=1   # total=7（已发布新闻）
 Invoke-RestMethod https://aaaa.qlxtools.asia/api/site/news?page=1&size=1       # total=1（空白模板）
+Invoke-RestMethod https://bjrobust.qlxtools.asia/api/site/banners             # 6 个页面都有 pic
+Invoke-RestMethod https://bbbb.qlxtools.asia/api/site/banners                 # pages={}，该站内页无 banner 区域
 ```
 
-线上后台用你自己的管理员密码登录后：`/admin` 顶部能看到站点下拉（超管），`/admin/platform` 能建站/绑域名/启停。
+线上后台用你自己的管理员密码登录后：`/admin` 顶部能看到站点下拉（超管），`/admin/platform` 能建站/绑域名/启停，以及一次维护所有站点的每个菜单头图。
 

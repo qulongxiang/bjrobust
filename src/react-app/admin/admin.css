@@ -592,6 +592,50 @@
 	}
 }
 
+/* 跨站头图矩阵：每格一个小缩略图 + 上传/清除 */
+.banner-matrix {
+	margin-top: 12px;
+	overflow-x: auto;
+}
+.banner-matrix th {
+	white-space: nowrap;
+}
+.banner-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 130px;
+}
+.banner-thumb {
+	height: 60px;
+	border: 1px solid #e5e9f0;
+	border-radius: 6px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: repeating-linear-gradient(45deg, #f7f9fc, #f7f9fc 8px, #f2f5f9 8px, #f2f5f9 16px);
+	font-size: 12px;
+}
+.banner-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	background: #fff;
+	display: block;
+}
+.banner-ops {
+	display: flex;
+	gap: 6px;
+}
+.banner-ops .btn.small {
+	padding: 3px 10px;
+}
+.banner-ops .btn.disabled {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
 /* ===== 站点切换（超管）/ 当前站点标识 ===== */
 .admin-site-switch {
 	margin: 0 12px 12px;

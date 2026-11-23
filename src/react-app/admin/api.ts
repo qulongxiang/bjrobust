@@ -331,4 +331,29 @@ export const adminApi = {
 		req<{ ok: boolean; created: boolean; message: string }>(`/api/admin/platform/sites/${id}/scaffold`, { method: "POST" }),
 	deletePlatformSite: (id: number, force = false) =>
 		req<{ ok: boolean }>(`/api/admin/platform/sites/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+
+	// ---- 跨站头图矩阵（仅超管） ----
+	platformBanners: () =>
+		req<{
+			ok: boolean;
+			pages: { page: string; label: string }[];
+			sites: { code: string; name: string; isActive: number }[];
+			matrix: Record<string, Record<string, { pic: string; url: string; updated: string }>>;
+		}>("/api/admin/platform/banners"),
+	uploadPlatformBanner: (code: string, page: string, file: File): Promise<{ ok: boolean }> => {
+		const form = new FormData();
+		form.append("file", file);
+		return fetch(`/api/admin/platform/banners/${code}/${page}`, {
+			method: "PUT",
+			credentials: "same-origin",
+			headers: { "X-CSRF": "1" },
+			body: form,
+		}).then(async (r) => {
+			const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+			if (!r.ok) throw new ApiError(r.status, d.error ?? `HTTP ${r.status}`);
+			return d as { ok: true };
+		});
+	},
+	clearPlatformBanner: (code: string, page: string) =>
+		req<{ ok: boolean }>(`/api/admin/platform/banners/${code}/${page}`, { method: "DELETE" }),
 };

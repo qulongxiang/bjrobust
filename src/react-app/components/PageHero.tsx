@@ -48,9 +48,12 @@ export default function PageHero({
 
 	return (
 		<>
-			<div className={`page-hero${pic ? "" : " page-hero--empty"}`}>
-				{pic ? <img src={imgUrl(pic)} alt="" /> : null}
-			</div>
+			{/* 该站点这一页没配头图时，整块 banner 区域不渲染（只留标题栏） */}
+			{pic ? (
+				<div className="page-hero">
+					<img src={imgUrl(pic)} alt="" />
+				</div>
+			) : null}
 			<div className="page-titlebar">
 				<div className="container page-titlebar-inner">
 					<h1>{title}</h1>
