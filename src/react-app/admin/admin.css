@@ -70,6 +70,13 @@
 	cursor: default;
 }
 
+.admin-login-tip {
+	margin: 14px 0 0;
+	color: #6b7280;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
 .admin-err {
 	margin-top: 12px;
 	color: #c5221f;

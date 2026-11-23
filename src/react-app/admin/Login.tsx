@@ -47,6 +47,9 @@ export default function Login({ onLogin }: { onLogin: (u: AdminUser) => void }) 
 				<button className="admin-login-btn" disabled={busy} onClick={submit}>
 					{busy ? "登录中…" : "登 录"}
 				</button>
+				<p className="admin-login-tip">
+					站点管理员账号只能在其所属站点的域名下登录；平台超管账号可在任意域名登录。
+				</p>
 			</div>
 		</div>
 	);

@@ -104,7 +104,31 @@ export async function verifyLogin(
 	)
 		.bind(userName, siteId, siteId)
 		.first();
-	if (!row) return { error: "用户名或密码错误" };
+	if (!row) {
+		// 账号确实存在、但属于别的站点：给明确提示，避免用户以为是密码错了
+		const other = await env.DB.prepare(
+			'SELECT "SiteId" FROM t_admin WHERE UserName = ? AND UserType = 2 AND "SiteId" > 0 LIMIT 1',
+		)
+			.bind(userName)
+			.first();
+		if (other) {
+			const sid = Number(other.SiteId);
+			const [site, dom] = await Promise.all([
+				env.DB.prepare("SELECT Code, Name FROM t_sites WHERE id = ?").bind(sid).first(),
+				env.DB.prepare(
+					'SELECT Host FROM t_site_domain WHERE "SiteId" = ? ORDER BY "IsPrimary" DESC LIMIT 1',
+				)
+					.bind(sid)
+					.first(),
+			]);
+			const label = site ? String(site.Name) : "其他站点";
+			const host = dom ? String(dom.Host) : "";
+			return {
+				error: `该账号属于「${label}」站点，只能在${host ? ` ${host} ` : "该站点域名"}的后台登录`,
+			};
+		}
+		return { error: "用户名或密码错误" };
+	}
 	// 与原系统一致：只校验 IsLock（Status 是服务档位，不是启用标志）
 	if (Number(row.IsLock) === 1) return { error: "账户已被锁定" };
 	const ok = await bcrypt.compare(password, String(row.PassWord));
