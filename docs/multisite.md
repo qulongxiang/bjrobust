@@ -230,6 +230,18 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
   8. `/admin` 带浏览器 `Accept` 必须 200（SPA 回退）
 - 每次改完 `npm run build` → `npx wrangler deploy` → `pwsh -File tools\smoke.ps1`，三步固定。
 
+## 6.9 后台可维护性与安全收口（2026-11-24）
+
+- **操作日志**：`lib/audit.ts` 的 `audit()` 写入 `t_log`（谁 / IP / 时间 / 做了什么），产品、新闻、分类、图集、轮播、头图、静态页、站点设置、账号、平台建站等写操作全部记账；后台「数据统计 → 操作日志」不再是旧库残留。
+- **图片删除保护**：`DELETE /api/admin/upload?path=…` 先查本站是否还有引用（头图/轮播/产品缩略图/新闻封面/图集/静态页正文/站点 Logo，用 `instr` 做纯子串匹配，避免 `%` `_` 通配误伤），命中返回 409 并列出引用方；确需强删带 `force=1`。
+- **图片库分页**：`GET /api/admin/upload/list?limit=&cursor=` 返回 `{items, cursor, truncated}`，后台「加载更多」翻页，不再只能看到前 200 张。
+- **租户隔离补漏**：`/assets/<别的站点code>/…` 一律 404（先用当前站点 code 比对，再查 `t_sites`），老布局（`cn-banner/x.jpg`、桶根平铺图）仍然放行；本地已验证 bjrobust 头图在 aaaa/bbbb 域名下 404。
+- **会话即时失效**：`adminGuard` 每次请求核对 `t_admin.IsLock`，账号被删/被锁后旧 JWT 不再能用到 12 小时。
+- **多站 SEO**：`lib/seo.ts`（站点默认 + 页面级 `applySeo`）用 `t_global` 的 title/keywords/description 覆盖 `index.html` 里写死的 bjrobust 文案，标题后缀带站点名；详情页用 `webTitle/webDesc/webKey` 并锁定，避免被站点默认值顶回去。
+- **读取侧清洗**：`lib/content.ts` 的 `stripActiveHtml()` 统一去掉 `<script>/<iframe>/on*` 属性，静态页、产品正文、新闻正文、首页片段都过一遍（前端 DOMPurify 是第二道）。
+- **新闻分类**：前台 tab 不再写死 3-7，改为「排除 1/2」；后台删分类前按全站引用检查（`t_newtype` 无 SiteId，是共用字典）。
+- **接口自检**：`tools/api_audit.mjs`（`npm run audit`），本地默认跑 65 项：前台读、边界值、后台认证、后台读写、越权/租户隔离；脚本默认拒绝非 localhost（会写临时数据，跑完自删）。
+
 ## 7. 已知限制（后续可做）
 
 - 前端产物是全站共用的一份（主题色/品牌走数据库，文案走 `t_content`）。如果以后某家要完全不同的版式，需要按站点追加独立页面组件。

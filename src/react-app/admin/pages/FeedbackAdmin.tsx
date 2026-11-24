@@ -11,6 +11,11 @@ export default function FeedbackAdmin() {
 	const load = useCallback(async () => {
 		try {
 			const d = await adminApi.feedback(page);
+			// 删掉最后一页唯一一条后会停在空页，自动退回上一页
+			if (!d.items.length && page > 1 && d.total > 0) {
+				setPage((p) => Math.max(p - 1, 1));
+				return;
+			}
 			setTotal(d.total);
 			setItems(d.items);
 		} catch (e) {

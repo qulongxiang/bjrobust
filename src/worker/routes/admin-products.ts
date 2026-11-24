@@ -5,6 +5,7 @@ import { nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
 import { normalizeContentImages } from "../lib/content";
 import { expandTypeIds, inClause } from "../lib/protype";
+import { audit } from "../lib/audit";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -96,6 +97,7 @@ app.post("/products", async (c) => {
 		String(b.bh ?? ""),
 		String(b.bz ?? ""),
 	);
+	await audit(c, `新增产品「${name}」#${Number(res.meta.last_row_id)}`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
@@ -135,6 +137,7 @@ app.put("/products/:id", async (c) => {
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
 	const res = await db.prepare(`UPDATE t_products SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `修改产品 #${id}`);
 	return c.json({ ok: true });
 });
 
@@ -147,6 +150,7 @@ app.delete("/products/:id", async (c) => {
 	await exec(db.prepare('DELETE FROM t_img WHERE "SiteId" = ? AND ProID = ?'), siteId, id);
 	const res = await exec(db.prepare('DELETE FROM t_products WHERE "SiteId" = ? AND id = ?'), siteId, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除产品 #${id}（含图集）`);
 	return c.json({ ok: true });
 });
 
@@ -193,12 +197,14 @@ app.post("/products/:id/images", async (c) => {
 		id,
 		CN,
 	);
+	await audit(c, `产品 #${id} 图集新增 1 张`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
 app.delete("/images/:id", async (c) => {
 	const res = await exec(c.env.DB.prepare('DELETE FROM t_img WHERE "SiteId" = ? AND id = ?'), c.get("siteId"), Number(c.req.param("id")));
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除图集条目 #${c.req.param("id")}`);
 	return c.json({ ok: true });
 });
 
@@ -251,6 +257,7 @@ app.post("/product-types", async (c) => {
 		pid ? String(pid) : "",
 		nowSql(),
 	);
+	await audit(c, `新增产品分类「${name}」`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
@@ -281,6 +288,7 @@ app.put("/product-types/:id", async (c) => {
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
 	const res = await db.prepare(`UPDATE t_protype SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `修改产品分类 #${id}`);
 	return c.json({ ok: true });
 });
 
@@ -294,6 +302,7 @@ app.delete("/product-types/:id", async (c) => {
 	if (used > 0) return c.json({ error: "该分类下仍有产品，不能删除" }, 400);
 	const res = await exec(db.prepare('DELETE FROM t_protype WHERE "SiteId" = ? AND id = ?'), siteId, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除产品分类 #${id}`);
 	return c.json({ ok: true });
 });
 

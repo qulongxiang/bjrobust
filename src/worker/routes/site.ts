@@ -11,6 +11,7 @@ import { exec, rows } from "../lib/d1";
 import { publicSlides } from "../lib/slide";
 import { assetCandidates, cacheControlFor, legacyEnabled } from "../lib/storage";
 import { expandTypeIds, inClause } from "../lib/protype";
+import { stripActiveHtml } from "../lib/content";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -35,7 +36,7 @@ function pickNews(r: Record<string, unknown>) {
 		id: Number(r.id),
 		title: String(r.Title ?? ""),
 		noteTime: String(r.NoteTime ?? ""),
-		content: rewriteUploads(String(r.Content ?? "")),
+		content: stripActiveHtml(rewriteUploads(String(r.Content ?? ""))),
 		order: Number(r.OrderBy ?? 0),
 		newType: Number(r.NewType ?? 0),
 		hits: Number(r.Hits ?? 0),
@@ -90,9 +91,7 @@ app.get("/global", async (c) => {
 	const fragments: Record<string, string> = {};
 	for (const r of fragRows) {
 		// 片段清洗：去掉 <script>（旧站残留的统计代码等），/upload/ 旧路径改写到 /assets/upload/（R2）
-		fragments[String(r.Called)] = String(r.Content ?? "")
-			.replace(/<script[\s\S]*?<\/script>/gi, "")
-			.replace(/(src|href)\s*=\s*["']\/upload\//g, '$1="/assets/upload/');
+		fragments[String(r.Called)] = stripActiveHtml(rewriteUploads(String(r.Content ?? "")));
 	}
 	return c.json({
 		ok: true,
@@ -298,7 +297,7 @@ app.get("/product/:id", async (c) => {
 		ok: true,
 		product: {
 			...pickProduct(rowPro),
-			content: String(rowPro.Content ?? ""),
+			content: stripActiveHtml(rewriteUploads(String(rowPro.Content ?? ""))),
 			memo: String(rowPro.Memo ?? ""),
 		},
 		typeName: String(typeRow?.Called ?? ""),
@@ -343,9 +342,10 @@ app.get("/page-banner", async (c) => {
 	return c.json({ ok: true, title: r ? String(r.Title ?? "") : "", pic: r ? String(r.SmallPic ?? "") : "" });
 });
 
-// ---- 新闻分类（前台 tab 用；1/2 为 banner 内部类型，不展示。分类是结构性字典，全站共用） ----
+// ---- 新闻分类（前台 tab 用；1/2 是 banner 内部类型，不展示。分类是结构性字典，全站共用） ----
 app.get("/news-types", async (c) => {
-	const list = await rows(c.env.DB.prepare("SELECT id, Called FROM t_newtype WHERE id IN (3,4,5,6,7) ORDER BY id"));
+	// 不要再写死 3-7：后台新增的分类（id 8+）前台也要能选到，只排除 1/2 两个 banner 内部类型
+	const list = await rows(c.env.DB.prepare("SELECT id, Called FROM t_newtype WHERE id NOT IN (1,2) ORDER BY id"));
 	return c.json(list.map((r) => ({ id: Number(r.id), name: String(r.Called ?? "") })));
 });
 
@@ -454,7 +454,7 @@ app.get("/page/:called", async (c) => {
 	return c.json({
 		ok: true,
 		called,
-		content: rewriteUploads(String(rowPage.Content ?? "")),
+		content: stripActiveHtml(rewriteUploads(String(rowPage.Content ?? ""))),
 		noteTime: String(rowPage.NoteTime ?? ""),
 	});
 });
@@ -521,9 +521,19 @@ assetsApp.get("/*", async (c) => {
 	const site = c.get("site") as SiteInfo | undefined;
 	const code = site?.code ?? "";
 	const key = c.req.path.replace(/^\/assets\//, "");
-	if (!key) return c.notFound();
+	if (!key || !code) return c.notFound();
+	// 租户隔离：形如 <别的站点code>/... 的 key 一律 404，否则任何域名都能把别家站点的图读走。
+	// 不带站点前缀的（cn-banner/xxx、upload/xxx 这类老布局）仍然放行，保证老数据不破图
+	const firstSeg = key.split("/")[0];
+	if (firstSeg !== code) {
+		const otherSite = await c.env.DB.prepare("/* site:global */ SELECT Code FROM t_sites WHERE Code = ?")
+			.bind(firstSeg)
+			.first();
+		if (otherSite) return c.notFound();
+	}
+	const legacy = legacyEnabled(c.env.LEGACY_LOOKUP);
 
-	const tries = assetCandidates(key, code, legacyEnabled(c.env.LEGACY_LOOKUP));
+	const tries = assetCandidates(key, code, legacy);
 	let obj: Awaited<ReturnType<typeof bucket.get>> = null;
 	let hitKey = key;
 	for (const t of tries) {

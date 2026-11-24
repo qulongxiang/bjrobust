@@ -4,9 +4,23 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import PageHero from "../components/PageHero";
 import { safeHtml } from "../lib/html";
+import { applySeo } from "../lib/seo";
 
 // 地图片段是旧站整页 HTML（含 <script>），dangerouslySetInnerHTML 不会执行脚本，
 // 所以这里解析出 AMap key 与坐标后动态加载高德 JS API 初始化地图；加载失败显示跳转链接兜底
+function plainText(html: string): string {
+	return html
+		.replace(/<[^>]*>/g, " ")
+		.replace(/&nbsp;/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+/** 没有 key / 坐标时不要再画一个空地图框，直接给"地址 + 在高德地图查看" */
+function mapSearchUrl(keyword: string): string {
+	return `https://uri.amap.com/search?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent("北京")}&src=bjrobust&coordinate=gaode&callnative=0`;
+}
+
 function AMapBox({ html }: { html: string }) {
 	const [failed, setFailed] = useState(false);
 	const divRef = useRef<HTMLDivElement>(null);
@@ -21,9 +35,8 @@ function AMapBox({ html }: { html: string }) {
 			return;
 		}
 		let cancelled = false;
-		const s = document.createElement("script");
-		s.src = `https://webapi.amap.com/maps?v=1.3&key=${keyM[1]}`;
-		s.onload = () => {
+		const w = window as unknown as { AMap?: unknown };
+		const init = () => {
 			if (cancelled || !divRef.current) return;
 			try {
 				const AMap = (window as unknown as { AMap: any }).AMap;
@@ -38,6 +51,16 @@ function AMapBox({ html }: { html: string }) {
 				setFailed(true);
 			}
 		};
+		// 已经加载过高德 SDK（比如从联系页来回切）就复用，别每次访问都往 head 里再塞一个 script
+		if (w.AMap) {
+			init();
+			return () => {
+				cancelled = true;
+			};
+		}
+		const s = document.createElement("script");
+		s.src = `https://webapi.amap.com/maps?v=1.3&key=${keyM[1]}`;
+		s.onload = init;
 		s.onerror = () => setFailed(true);
 		document.head.appendChild(s);
 		return () => {
@@ -48,14 +71,17 @@ function AMapBox({ html }: { html: string }) {
 	if (failed) {
 		const m = html.match(/lnglat:\s*\{\s*lng:\s*([\d.]+),\s*lat:\s*([\d.]+)/);
 		const nameM = html.match(/name:\s*"([^"]+)"/);
+		const label = nameM?.[1] ?? "公司地址";
 		return (
 			<div className="map-fallback">
-				<div>{nameM?.[1] ?? "公司地址"}</div>
-				{m ? (
-					<a href={`https://uri.amap.com/marker?position=${m[1]},${m[2]}&name=${encodeURIComponent(nameM?.[1] ?? "公司地址")}`} target="_blank" rel="noreferrer">
-						点击在高德地图中查看位置
-					</a>
-				) : null}
+				<div>{label}</div>
+				<a
+					href={m ? `https://uri.amap.com/marker?position=${m[1]},${m[2]}&name=${encodeURIComponent(label)}` : mapSearchUrl(label)}
+					target="_blank"
+					rel="noreferrer"
+				>
+					点击在高德地图中查看位置
+				</a>
 			</div>
 		);
 	}
@@ -67,10 +93,22 @@ function AMapBox({ html }: { html: string }) {
 }
 
 export default function Contact() {
+	// 页面级 SEO：标题/描述覆盖站点默认值
+	useEffect(() => {
+		applySeo({ raw: "联系我们" });
+	}, []);
 	const [info, setInfo] = useState("");
 	const [map, setMap] = useState("");
 	const [name, setName] = useState("");
 	const [content, setContent] = useState("");
+	// 地图数据是否足够（key + 经纬度），不够就不画地图
+	const hasGeo = /key=[a-f0-9]{16,}/.test(map) && /lnglat/.test(map);
+	const addrText = (() => {
+		const t = plainText(info);
+		const m = t.match(/地址[：:]\s*([^:：]{4,80})/);
+		// 中英混排时把尾巴上的英文字段一起切掉，只留中文地址
+		return (m?.[1] ?? "").replace(/\s*[A-Za-z][\s\S]*$/, "").trim();
+	})();
 	const [sending, setSending] = useState(false);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -113,7 +151,19 @@ export default function Contact() {
 			<section className="section">
 				<div className="container">
 					{info ? <div className="rich static-page" dangerouslySetInnerHTML={{ __html: safeHtml(info) }} /> : null}
-					{map ? <div style={{ marginTop: 24 }}><AMapBox html={map} /></div> : null}
+					{hasGeo ? (
+						<div style={{ marginTop: 24 }}>
+							<AMapBox html={map} />
+						</div>
+					) : addrText ? (
+						// 没有地图坐标/密钥时不再吊一个空框，改成地址 + 可点的地图链接
+						<div className="map-addr" style={{ marginTop: 24 }}>
+							<div>公司地址：{addrText}</div>
+							<a href={mapSearchUrl(addrText)} target="_blank" rel="noreferrer">
+								在高德地图中查看位置
+							</a>
+						</div>
+					) : null}
 
 					<div className="form-card" style={{ marginTop: 36 }}>
 						<h3 style={{ marginTop: 0 }}>在线留言</h3>

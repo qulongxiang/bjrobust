@@ -7,6 +7,7 @@ import { isSuper, nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
 import { createSlide, deleteSlide, readSlides, updateSlide } from "../lib/slide";
 import { normalizeContentImages } from "../lib/content";
+import { audit } from "../lib/audit";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -41,6 +42,7 @@ app.get("/feedback", async (c) => {
 app.delete("/feedback/:id", async (c) => {
 	const res = await exec(c.env.DB.prepare('DELETE FROM t_feedback WHERE "SiteId" = ? AND id = ?'), c.get("siteId"), Number(c.req.param("id")));
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除留言 #${c.req.param("id")}`);
 	return c.json({ ok: true });
 });
 
@@ -89,6 +91,7 @@ app.put("/global", async (c) => {
 	params.push(String(siteId));
 	const res = await db.prepare(`UPDATE t_global SET ${sets.join(", ")} WHERE SiteId = ?`).bind(...params).run();
 	if (!res.meta.changes) return c.json({ error: "站点记录不存在" }, 404);
+	await audit(c, "保存站点全局设置");
 	return c.json({ ok: true });
 });
 
@@ -120,6 +123,7 @@ app.put("/content/:called", async (c) => {
 	} else {
 		await exec(db.prepare("INSERT INTO t_content (SiteId, Called, NoteTime, Content, Language) VALUES (?,?,?,?,?)"), siteId, called, nowSql(), content, CN);
 	}
+	await audit(c, `保存静态页「${called}」`);
 	return c.json({ ok: true });
 });
 
@@ -179,6 +183,7 @@ app.put("/site-meta", async (c) => {
 	sets.push('"UpdatedAt" = ?');
 	const res = await db.prepare(`UPDATE t_sites SET ${sets.join(", ")} WHERE "id" = ?`).bind(...params).run();
 	if (!res.meta.changes) return c.json({ error: "站点不存在" }, 404);
+	await audit(c, "保存站点品牌与主题");
 	return c.json({ ok: true });
 });
 
@@ -195,6 +200,7 @@ app.post("/slides", async (c) => {
 		link: String(b.link ?? ""),
 		order: Number(b.order ?? 0) || 0,
 	});
+	await audit(c, `新增首页轮播 #${id}`);
 	return c.json({ ok: true, id });
 });
 
@@ -203,12 +209,14 @@ app.put("/slides/:id", async (c) => {
 	if (!b) return c.json({ error: "请求格式错误" }, 400);
 	const ok = await updateSlide(c.env, c.get("siteId"), Number(c.req.param("id")), b);
 	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `修改首页轮播 #${c.req.param("id")}`);
 	return c.json({ ok: true });
 });
 
 app.delete("/slides/:id", async (c) => {
 	const ok = await deleteSlide(c.env, c.get("siteId"), Number(c.req.param("id")));
 	if (!ok) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除首页轮播 #${c.req.param("id")}`);
 	return c.json({ ok: true });
 });
 
@@ -312,6 +320,7 @@ app.post("/users", async (c) => {
 		"",
 		"",
 	);
+	await audit(c, `新增管理员 ${username}（站点 ${targetSiteId}）`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
@@ -390,6 +399,7 @@ app.put("/users/:id/password", async (c) => {
 	const hash = await bcrypt.hash(password, 10);
 	const res = await exec(db.prepare("UPDATE t_admin SET PassWord = ? WHERE id = ?"), hash, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `重置账号密码 #${id}`);
 	return c.json({ ok: true });
 });
 
@@ -411,6 +421,7 @@ app.put("/users/:id/lock", async (c) => {
 	const locked = Number(b?.locked ?? 0) === 1 ? 1 : 0;
 	const res = await exec(db.prepare("UPDATE t_admin SET IsLock = ? WHERE id = ?"), locked, id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, locked ? `锁定账号 #${id}` : `解锁账号 #${id}`);
 	return c.json({ ok: true });
 });
 

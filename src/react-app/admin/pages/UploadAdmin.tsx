@@ -6,6 +6,8 @@ export default function UploadAdmin() {
 	const [items, setItems] = useState<UploadFile[]>([]);
 	const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 	const [uploading, setUploading] = useState(false);
+	const [cursor, setCursor] = useState("");
+	const [loadingMore, setLoadingMore] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const flash = (ok: boolean, text: string) => {
@@ -15,13 +17,29 @@ export default function UploadAdmin() {
 
 	const load = useCallback(async () => {
 		try {
-			const d = await adminApi.uploadList();
+			const d = await adminApi.uploadList("");
 			setItems(d.items);
+			setCursor(d.cursor);
 		} catch (e) {
 			flash(false, e instanceof Error ? e.message : "加载失败");
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// 图片一多，一次只列一页；「加载更多」翻后面的，避免以前永远只看到前 200 张
+	const loadMore = async () => {
+		if (!cursor || loadingMore) return;
+		setLoadingMore(true);
+		try {
+			const d = await adminApi.uploadList(cursor);
+			setItems((prev) => [...prev, ...d.items]);
+			setCursor(d.cursor);
+		} catch (e) {
+			flash(false, e instanceof Error ? e.message : "加载失败");
+		} finally {
+			setLoadingMore(false);
+		}
+	};
 
 	useEffect(() => {
 		load();
@@ -89,24 +107,41 @@ export default function UploadAdmin() {
 			<input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
 
 			{items.length ? (
-				<div className="upload-grid">
-					{items.map((f) => (
-						<div className="upload-item" key={f.key}>
-							<img src={`/assets/${f.key}`} alt={f.key} loading="lazy" />
-							<div className="info" title={f.key}>
-								{f.key}（{(f.size / 1024).toFixed(0)}KB）
+				<>
+					<div className="admin-page-head" style={{ marginBottom: 10 }}>
+						<span className="muted" style={{ fontSize: 12 }}>
+							已加载 {items.length} 张（按上传时间倒序）
+						</span>
+					</div>
+					<div className="upload-grid">
+						{items.map((f) => (
+							<div className="upload-item" key={f.key}>
+								<img src={`/assets/${f.key}`} alt={f.key} loading="lazy" />
+								<div className="info" title={f.key}>
+									{f.key}（{(f.size / 1024).toFixed(0)}KB）
+								</div>
+								<div className="muted" style={{ padding: "0 8px", fontSize: 11 }}>
+									{f.updated ? f.updated.slice(0, 16).replace("T", " ") : ""}
+								</div>
+								<div style={{ padding: "0 8px 8px", display: "flex", gap: 6 }}>
+									<button className="btn small" style={{ flex: 1 }} onClick={() => copyPath(f.key)}>
+										复制路径
+									</button>
+									<button className="btn small danger" onClick={() => remove(f.key)}>
+										删
+									</button>
+								</div>
 							</div>
-							<div style={{ padding: "0 8px 8px", display: "flex", gap: 6 }}>
-								<button className="btn small" style={{ flex: 1 }} onClick={() => copyPath(f.key)}>
-									复制路径
-								</button>
-								<button className="btn small danger" onClick={() => remove(f.key)}>
-									删
-								</button>
-							</div>
+						))}
+					</div>
+					{cursor ? (
+						<div className="pager" style={{ marginTop: 14 }}>
+							<button className="btn" disabled={loadingMore} onClick={loadMore}>
+								{loadingMore ? "加载中…" : "加载更多"}
+							</button>
 						</div>
-					))}
-				</div>
+					) : null}
+				</>
 			) : (
 				<div className="empty-tip">暂无图片</div>
 			)}

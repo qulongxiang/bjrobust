@@ -39,6 +39,11 @@ export default function NewsAdmin() {
 	const load = useCallback(async () => {
 		try {
 			const d = await adminApi.news(type || undefined, page);
+			// 删掉最后一页最后一条后自动退回上一页，不停在空列表
+			if (!d.items.length && page > 1 && d.total > 0) {
+				setPage((p) => Math.max(p - 1, 1));
+				return;
+			}
 			setTotal(d.total);
 			setItems(d.items);
 		} catch (e) {
@@ -291,6 +296,24 @@ export default function NewsAdmin() {
 								value={editing.webDesc}
 								onChange={(e) => setEditing({ ...editing, webDesc: e.target.value })}
 							/>
+						</div>
+						<div className="admin-row">
+							<div className="admin-field">
+								<label>跳转链接（品牌/合作伙伴用）</label>
+								<input
+									value={editing.link}
+									onChange={(e) => setEditing({ ...editing, link: e.target.value })}
+									placeholder="https://…（可选）"
+								/>
+							</div>
+							<div className="admin-field">
+								<label>附件地址（可选）</label>
+								<input value={editing.down} onChange={(e) => setEditing({ ...editing, down: e.target.value })} />
+							</div>
+						</div>
+						<div className="admin-field">
+							<label>备注（可选）</label>
+							<input value={editing.memo} onChange={(e) => setEditing({ ...editing, memo: e.target.value })} />
 						</div>
 						<div className="admin-field">
 							<label>正文（HTML）</label>

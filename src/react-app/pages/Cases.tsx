@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, imgUrl, type NewsItem, type Paged } from "../api";
 import Pager from "../components/Pager";
+import { applySeo } from "../lib/seo";
 import PageHero from "../components/PageHero";
 
 const PAGE_SIZE = 10;
 
 export default function Cases() {
+	// 页面级 SEO：标题/描述覆盖站点默认值
+	useEffect(() => {
+		applySeo({ raw: "成功案例" });
+	}, []);
 	const [params, setParams] = useSearchParams();
 	const page = Math.max(Number(params.get("page") ?? 1), 1);
 	const [data, setData] = useState<Paged<NewsItem> | null>(null);

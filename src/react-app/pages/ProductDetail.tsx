@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, imgUrl, type ProductDetailData } from "../api";
+import { applySeo } from "../lib/seo";
 import PageHero from "../components/PageHero";
 import { safeHtml } from "../lib/html";
 
@@ -19,9 +20,11 @@ export default function ProductDetail() {
 			.product(Number(id))
 			.then((data) => {
 				setD(data);
-				if (data.product.webTitle || data.product.name) {
-					document.title = data.product.webTitle || data.product.name;
-				}
+				applySeo({
+					raw: data.product.webTitle || data.product.name,
+					description: data.product.webDesc || data.product.memo || undefined,
+					keywords: data.product.webKey || undefined,
+				});
 			})
 			.catch(() => setFailed(true));
 	}, [id]);

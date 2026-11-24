@@ -20,6 +20,19 @@ function toStorageKey(url: string): string {
 }
 
 /**
+ * 读取侧的最低限度清洗：去掉 <script>/<iframe>/on* 事件属性。
+ * 前端另有 DOMPurify 兜底，这里只保证接口本身不把脚本原样吐给任何客户端（邮件/第三方抓取也会读接口）
+ */
+export function stripActiveHtml(html: string): string {
+	if (!html) return "";
+	return html
+		.replace(/<script[\s\S]*?<\/script>/gi, "")
+		.replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+		.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+		.replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
+/**
  * 解析到真实存在的 key：命中返回 `/assets/<key>`，一个都命中就原样返回
  * legacy 候选顺序使用 assetCandidates（包含上一版目录与老站布局）
  */

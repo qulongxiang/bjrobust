@@ -18,9 +18,9 @@ const CSP_BASE = [
 	"img-src 'self' data: blob: https:",
 	"font-src 'self' data:",
 	"style-src 'self' 'unsafe-inline'",
-	// 联系页按需加载高德地图 JS API
-	"script-src 'self' https://webapi.amap.com",
-	"connect-src 'self' https:",
+	// 联系页按需加载高德地图 JS API；CF 会自动注入 Web Analytics 的 beacon 脚本
+	"script-src 'self' https://webapi.amap.com https://static.cloudflareinsights.com",
+	"connect-src 'self' https: https://cloudflareinsights.com",
 ];
 
 export function securityHeaders(): MiddlewareHandler<{

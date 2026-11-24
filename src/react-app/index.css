@@ -183,3 +183,16 @@ select {
 	text-align: center;
 	line-height: 34px;
 }
+
+/* 没有坐标时只显示"地址 + 地图链接"，不需要占位大框 */
+.map-addr {
+	padding: 4px 0 0;
+	line-height: 2;
+	font-size: 14px;
+	color: #333;
+}
+
+.map-addr a {
+	color: var(--primary, #14508c);
+	margin-left: 8px;
+}

@@ -1,7 +1,7 @@
 // 认证核心：JWT(HS256) 会话 + bcrypt 登录验证 + 站点归属 + 防暴破限流
 import { createHmac, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { getCookie } from "hono/cookie";
+import { deleteCookie, getCookie } from "hono/cookie";
 import type { Context, MiddlewareHandler } from "hono";
 import type { AdminInfo, AppEnv, AdminVariables, SiteInfo } from "../env";
 import { adminSiteOverride, siteByCode, siteById, resolveSiteByHost } from "./tenant";
@@ -186,6 +186,16 @@ export function adminGuard(): MiddlewareHandler<{
 		c.set("admin", admin);
 		c.set("site", active);
 		c.set("siteId", active.id);
+		// 账号被删/被锁定后，旧会话不能继续用满 12 小时——每次请求核对一次账号状态
+		const row = await c.env.DB.prepare('SELECT IsLock FROM t_admin WHERE id = ?').bind(admin.id).first();
+		if (!row) {
+			deleteCookie(c, COOKIE_NAME, { path: "/" });
+			return c.json({ error: "账号不存在，请重新登录" }, 401);
+		}
+		if (Number(row.IsLock ?? 0) === 1) {
+			deleteCookie(c, COOKIE_NAME, { path: "/" });
+			return c.json({ error: "账号已被锁定，请联系管理员" }, 401);
+		}
 		await next();
 	};
 }

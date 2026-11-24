@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, imgUrl, type NewsDetailData } from "../api";
 import PageHero from "../components/PageHero";
 import { safeHtml } from "../lib/html";
+import { applySeo } from "../lib/seo";
 
 export default function CaseDetail() {
 	const { id } = useParams();
@@ -17,9 +18,11 @@ export default function CaseDetail() {
 			.caseDetail(Number(id))
 			.then((data) => {
 				setD(data);
-				if (data.news.webTitle || data.news.title) {
-					document.title = data.news.webTitle || data.news.title;
-				}
+				applySeo({
+					raw: data.news.webTitle || data.news.title,
+					description: data.news.webDesc || data.news.memo || undefined,
+					keywords: data.news.webKey || undefined,
+				});
 			})
 			.catch(() => setFailed(true));
 	}, [id]);

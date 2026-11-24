@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { api, assetUrl, type GlobalInfo, type SiteMeta, type SiteTheme } from "../api";
 import { safeHtml } from "../lib/html";
+import { applySiteSeo, setBrand } from "../lib/seo";
 
 const NAV = [
 	{ to: "/", label: "首页", end: true },
@@ -35,6 +36,12 @@ export default function Layout() {
 			.then((d) => {
 				setSite(d.site);
 				applyTheme(d.site.theme);
+				setBrand(d.site.name || d.site.companyName || "");
+				// index.html 里的标题/关键词/描述是写死的 bjrobust 文案，多站点必须按本站覆盖
+				applySiteSeo({
+					title: `${d.site.name || "官网"} - ${d.site.companyName || ""}`.replace(/ - $/, ""),
+					description: `${d.site.companyName || d.site.name} 官方网站`,
+				});
 			})
 			.catch(() => {});
 		api
@@ -42,7 +49,12 @@ export default function Layout() {
 			.then((d) => {
 				setG(d.global);
 				setFragments(d.fragments);
-				if (d.global?.title) document.title = d.global.title;
+				// 站点默认值先铺底；页面级 applySeo 会锁定并覆盖，避免详情页标题被这里顶回站点名
+				applySiteSeo({
+					title: d.global?.title || undefined,
+					keywords: d.global?.keywords || undefined,
+					description: d.global?.description || undefined,
+				});
 			})
 			.catch(() => {});
 	}, []);

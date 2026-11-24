@@ -37,6 +37,11 @@ export default function ProductAdmin() {
 	const loadList = useCallback(async () => {
 		try {
 			const d = await adminApi.products(typeId || undefined, page);
+			// 删掉最后一页的最后一条后会停在空页，往上退一页
+			if (!d.items.length && page > 1 && d.total > 0) {
+				setPage((p) => Math.max(p - 1, 1));
+				return;
+			}
 			setTotal(d.total);
 			setItems(d.items);
 		} catch (e) {

@@ -7,6 +7,7 @@ import { count, exec, rows } from "../lib/d1";
 import { hasContent, scaffoldSite } from "../lib/scaffold";
 import { createSlide, deleteSlide, readSlides, updateSlide } from "../lib/slide";
 import { normalizeHost, siteByCode } from "../lib/tenant";
+import { audit } from "../lib/audit";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 
@@ -102,6 +103,19 @@ app.post("/platform/sites", async (c) => {
 	const exists = await siteByCode(env, code);
 	if (exists) return c.json({ error: "站点标识已存在" }, 400);
 
+	const hosts: string[] = Array.isArray(b.hosts) ? b.hosts : [];
+	// 建站前先校验域名：域名被别的站占用时直接报错，不能静默跳过（更不能抢走别人的域名）
+	const cleanHosts: string[] = [];
+	for (const raw of hosts) {
+		const host = normalizeHost(String(raw));
+		if (!host) continue;
+		if (!HOST_RE.test(host)) return c.json({ error: `域名格式不合法: ${host}` }, 400);
+		if (cleanHosts.includes(host)) continue;
+		const other = (await rows(env.DB.prepare('SELECT "SiteId","Host" FROM t_site_domain WHERE "Host" = ?').bind(host)))[0];
+		if (other) return c.json({ error: `域名 ${host} 已绑定到其他站点，请先解绑` }, 400);
+		cleanHosts.push(host);
+	}
+
 	const theme = pickTheme(b.theme) ?? JSON.stringify({ primary: "#14508c", primaryDark: "#0e3c6e", accent: "#ff9f00" });
 	const ts = nowSql();
 	const res = await exec(
@@ -121,10 +135,7 @@ app.post("/platform/sites", async (c) => {
 	);
 	const siteId = Number(res.meta.last_row_id);
 
-	const hosts: string[] = Array.isArray(b.hosts) ? b.hosts : [];
-	for (const [i, raw] of hosts.entries()) {
-		const host = normalizeHost(String(raw));
-		if (!HOST_RE.test(host)) continue;
+	for (const [i, host] of cleanHosts.entries()) {
 		await exec(
 			env.DB.prepare('INSERT OR IGNORE INTO t_site_domain ("SiteId","Host","IsPrimary","CreatedAt") VALUES (?,?,?,?)'),
 			siteId,
@@ -137,6 +148,7 @@ app.post("/platform/sites", async (c) => {
 	if (b.init !== false) {
 		await scaffoldSite(env, siteId, { name, companyName: String(b.companyName ?? "") || name });
 	}
+	await audit(c, `新建站点 ${code}`);
 	return c.json({ ok: true, id: siteId, code });
 });
 
@@ -181,6 +193,7 @@ app.put("/platform/sites/:id", async (c) => {
 	sets.push('"UpdatedAt" = ?');
 	const res = await env.DB.prepare(`UPDATE t_sites SET ${sets.join(", ")} WHERE "id" = ?`).bind(...params, id).run();
 	if (!res.meta.changes) return c.json({ error: "站点不存在" }, 404);
+	await audit(c, `修改站点 #${id}`);
 	return c.json({ ok: true });
 });
 
@@ -218,6 +231,7 @@ app.put("/platform/sites/:id/domains", async (c) => {
 			ts,
 		);
 	}
+	await audit(c, `更新站点 #${id} 域名：${clean.join(",") || "（清空）"}`);
 	return c.json({ ok: true, hosts: clean });
 });
 
@@ -255,6 +269,18 @@ app.delete("/platform/sites/:id", async (c) => {
 	}
 	await exec(env.DB.prepare('DELETE FROM t_site_domain WHERE "SiteId" = ?'), id);
 	await exec(env.DB.prepare('DELETE FROM t_sites WHERE "id" = ?'), id);
+	// 顺手清掉该站点目录下的对象，否则 40 个站点删删建建会留一堆谁都读不到的孤儿图
+	if (env.IMAGES) {
+		const bucket = env.IMAGES;
+		let cursor: string | undefined;
+		for (let i = 0; i < 50; i++) {
+			const page = await bucket.list({ prefix: `${code}/`, limit: 1000, cursor });
+			if (page.objects.length) await Promise.all(page.objects.map((o) => bucket.delete(o.key)));
+			if (!page.truncated) break;
+			cursor = page.cursor;
+		}
+	}
+	await audit(c, `删除站点 ${code}`);
 	return c.json({ ok: true });
 });
 

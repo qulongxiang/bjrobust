@@ -315,7 +315,10 @@ export const adminApi = {
 			return d as { ok: true; path: string; url: string };
 		});
 	},
-	uploadList: () => req<{ ok: boolean; items: UploadFile[] }>("/api/admin/upload/list"),
+	uploadList: (cursor = "") =>
+		req<{ ok: boolean; items: UploadFile[]; cursor: string; truncated: boolean }>(
+			`/api/admin/upload/list?limit=60${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+		),
 	delUpload: (path: string) =>
 		req<{ ok: boolean }>(`/api/admin/upload?path=${encodeURIComponent(path)}`, { method: "DELETE" }),
 

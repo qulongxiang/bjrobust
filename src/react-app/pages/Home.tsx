@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, imgUrl, type HomeData } from "../api";
 import { safeHtml } from "../lib/html";
+import { applySeo } from "../lib/seo";
 
 export default function Home() {
 	const [d, setD] = useState<HomeData | null>(null);
@@ -19,7 +20,15 @@ export default function Home() {
 	};
 
 	useEffect(() => {
-		api.home().then(setD).catch(() => setD(null));
+		api.home().then((data) => {
+			setD(data);
+			// 首页标题用站点自己的 SEO 文案，并锁定，避免被 Layout 的默认值盖掉
+			applySeo({
+				title: data.global?.title || undefined,
+				keywords: data.global?.keywords || undefined,
+				description: data.global?.description || undefined,
+			});
+		}).catch(() => setD(null));
 	}, []);
 
 	useEffect(() => {

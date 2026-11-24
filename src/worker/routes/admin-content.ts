@@ -4,6 +4,7 @@ import type { AppEnv, AdminVariables } from "../env";
 import { nowSql } from "../lib/auth";
 import { count, exec, rows } from "../lib/d1";
 import { normalizeContentImages } from "../lib/content";
+import { audit } from "../lib/audit";
 
 const app = new Hono<{ Bindings: AppEnv; Variables: AdminVariables }>();
 const CN = "cn";
@@ -90,6 +91,7 @@ app.post("/news", async (c) => {
 		String(b.down ?? ""),
 		String(b.memo ?? ""),
 	);
+	await audit(c, `新增新闻「${title}」#${Number(res.meta.last_row_id)}`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
@@ -129,12 +131,14 @@ app.put("/news/:id", async (c) => {
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
 	const res = await db.prepare(`UPDATE t_news SET ${sets.join(", ")} WHERE "SiteId" = ? AND id = ?`).bind(...params, siteId, id).run();
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `修改新闻 #${id}`);
 	return c.json({ ok: true });
 });
 
 app.delete("/news/:id", async (c) => {
 	const res = await exec(c.env.DB.prepare('DELETE FROM t_news WHERE "SiteId" = ? AND id = ?'), c.get("siteId"), Number(c.req.param("id")));
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除新闻 #${c.req.param("id")}`);
 	return c.json({ ok: true });
 });
 
@@ -149,6 +153,7 @@ app.post("/news-types", async (c) => {
 	const name = String(b?.name ?? "").trim().slice(0, 100);
 	if (!name) return c.json({ error: "分类名不能为空" }, 400);
 	const res = await exec(c.env.DB.prepare("INSERT INTO t_newtype (Called, Language) VALUES (?, ?)"), name, CN);
+	await audit(c, `新增新闻分类「${name}」`);
 	return c.json({ ok: true, id: Number(res.meta.last_row_id) });
 });
 
@@ -167,12 +172,13 @@ app.put("/news-types/:id", async (c) => {
 
 app.delete("/news-types/:id", async (c) => {
 	const db = c.env.DB;
-	const siteId = c.get("siteId");
 	const id = Number(c.req.param("id"));
-	const used = await count(db.prepare('SELECT COUNT(*) AS n FROM t_news WHERE "SiteId" = ? AND NewType = ?').bind(siteId, id));
-	if (used > 0) return c.json({ error: "该分类下仍有内容，不能删除" }, 400);
+	// t_newtype 是全站共用的结构性字典（没有 SiteId），只查本站会误删别的站还在用的分类
+	const used = await count(db.prepare("/* site:global */ SELECT COUNT(*) AS n FROM t_news WHERE NewType = ?").bind(id));
+	if (used > 0) return c.json({ error: `该分类下仍有 ${used} 条内容（含其它站点），不能删除` }, 400);
 	const res = await exec(db.prepare("DELETE FROM t_newtype WHERE id = ?"), id);
 	if (!res.meta.changes) return c.json({ error: "记录不存在" }, 404);
+	await audit(c, `删除新闻分类 #${id}`);
 	return c.json({ ok: true });
 });
 

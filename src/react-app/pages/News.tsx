@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, imgUrl, type NewsItem, type NewsType, type Paged } from "../api";
 import Pager from "../components/Pager";
+import { applySeo } from "../lib/seo";
 import PageHero from "../components/PageHero";
 
 const PAGE_SIZE = 10;
 
 export default function News() {
+	// 页面级 SEO：标题/描述覆盖站点默认值
+	useEffect(() => {
+		applySeo({ raw: "新闻资讯" });
+	}, []);
 	const [params, setParams] = useSearchParams();
 	const type = Number(params.get("type") ?? 3);
 	const page = Math.max(Number(params.get("page") ?? 1), 1);
@@ -15,7 +20,11 @@ export default function News() {
 	const [data, setData] = useState<(Paged<NewsItem> & { type: NewsType }) | null>(null);
 
 	useEffect(() => {
-		api.newsTypes().then(setTypes).catch(() => {});
+		// 6/7 是代理品牌/合作伙伴，属于「公司概况」页的图片墙，不放在新闻 tab 里（点进去只会是几张 logo）
+		api
+			.newsTypes()
+			.then((list) => setTypes(list.filter((t) => t.id !== 6 && t.id !== 7)))
+			.catch(() => {});
 	}, []);
 
 	useEffect(() => {

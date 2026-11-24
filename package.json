@@ -44,7 +44,9 @@
 		"deploy": "wrangler deploy",
 		"dev": "vite",
 		"lint": "eslint .",
+    "audit": "node tools/api_audit.mjs",
 		"preview": "npm run build && vite preview"
 	},
 	"type": "module"
 }
+

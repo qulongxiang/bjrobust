@@ -4,8 +4,13 @@ import { Link } from "react-router-dom";
 import { api, imgUrl, type NewsItem } from "../api";
 import PageHero from "../components/PageHero";
 import { safeHtml } from "../lib/html";
+import { applySeo } from "../lib/seo";
 
 export default function About() {
+	// 页面级 SEO：标题/描述覆盖站点默认值
+	useEffect(() => {
+		applySeo({ raw: "公司概况" });
+	}, []);
 	const [content, setContent] = useState("");
 	const [partners, setPartners] = useState<NewsItem[]>([]);
 	const [failed, setFailed] = useState(false);
