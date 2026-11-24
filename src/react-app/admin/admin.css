@@ -998,3 +998,29 @@
 	border-radius: 6px;
 	background: #fff;
 }
+
+/* 历史图片清理列表 */
+.orphan-list {
+	margin-top: 10px;
+	border: 1px solid #e3e8ef;
+	border-radius: 6px;
+	max-height: 280px;
+	overflow-y: auto;
+}
+.orphan-item {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	padding: 6px 10px;
+	border-bottom: 1px solid #f0f2f6;
+	font-size: 12px;
+}
+.orphan-item:last-child { border-bottom: none; }
+.orphan-key {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: ui-monospace, Consolas, monospace;
+}

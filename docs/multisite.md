@@ -241,6 +241,8 @@ Invoke-RestMethod http://127.0.0.1:8792/api/site/site-info   # 应返回 站点 
 - **读取侧清洗**：`lib/content.ts` 的 `stripActiveHtml()` 统一去掉 `<script>/<iframe>/on*` 属性，静态页、产品正文、新闻正文、首页片段都过一遍（前端 DOMPurify 是第二道）。
 - **新闻分类**：前台 tab 不再写死 3-7，改为「排除 1/2」；后台删分类前按全站引用检查（`t_newtype` 无 SiteId，是共用字典）。
 - **接口自检**：`tools/api_audit.mjs`（`npm run audit`），本地默认跑 65 项：前台读、边界值、后台认证、后台读写、越权/租户隔离；脚本默认拒绝非 localhost（会写临时数据，跑完自删）。
+- **多语言安全**：`PUT /api/admin/global` 只改 `Language = 'cn'` 那一行，且定位到 `MIN(id)`（前台读的就是它）；历史上有重复 `(SiteId, cn)` 行（如 id=2 的 `ZZSITE/t/k` 残留），`migrations/0002_global_dedupe.sql` 保留有效行、删重复行并加唯一索引 `idx_t_global_site_lang`，之后模板初始化不会再插重复行。
+- **历史图片清理**：平台管理页新增「历史图片清理」面板（`GET /api/admin/platform/orphans` 扫描 + `POST /api/admin/platform/orphans/purge` 删除，删除必须带 `confirm=DELETE`）。只处理"没有站点前缀"的对象（旧 PHP 站桶根图、已删站点的目录），扫描时把全站头图/轮播/产品/新闻/图集/Logo/正文拼成文本做子串比对，仍被引用的自动跳过并回传 `skipped`；这两条 SQL 都是全站查询，必须带 `/* site:global */` 才过 DB_GUARD。
 
 ## 7. 已知限制（后续可做）
 

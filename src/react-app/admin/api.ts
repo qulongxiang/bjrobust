@@ -408,6 +408,22 @@ export const adminApi = {
 	) => req<{ ok: boolean }>(`/api/admin/platform/slides/${code}/${id}`, { method: "PUT", body: j(b) }),
 	platformDelSlide: (code: string, id: number) =>
 		req<{ ok: boolean }>(`/api/admin/platform/slides/${code}/${id}`, { method: "DELETE" }),
+	platformOrphans: () =>
+		req<{
+			ok: boolean;
+			total: number;
+			candidates: number;
+			orphans: number;
+			used: number;
+			size: number;
+			truncated: boolean;
+			items: { key: string; size: number; uploaded: string; used: boolean }[];
+		}>("/api/admin/platform/orphans"),
+	platformPurgeOrphans: (keys?: string[]) =>
+		req<{ ok: boolean; deleted: number; skipped: string[] }>("/api/admin/platform/orphans/purge", {
+			method: "POST",
+			body: j({ confirm: "DELETE", keys: keys ?? [] }),
+		}),
 
 	/** 把图片上传到"指定站点"目录（超管跨站维护素材用） */
 	uploadFilesFor: (code: string, file: File): Promise<{ ok: boolean; path: string; url: string }> => {

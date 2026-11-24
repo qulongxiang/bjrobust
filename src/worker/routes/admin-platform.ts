@@ -394,4 +394,85 @@ app.delete("/platform/slides/:code/:id", async (c) => {
 	return c.json({ ok: true });
 });
 
+// ---- 历史图片清理：桶根无站点前缀的老图（旧 PHP 站遗留、已删站点的目录） ----
+// 以前只能让默认站点管理员一张张删；这里给超管一个"先扫描再删"的入口，扫描结果里只要还被引用就不会删
+async function refTexts(env: AppEnv): Promise<string[]> {
+	// 这里要看的是"全站所有内容"，不是某一站，必须显式标记 site:global 才能过 DB_GUARD
+	const [banner, slide, product, news, gallery, big, logo, content] = await Promise.all([
+		rows(env.DB.prepare('/* site:global */ SELECT "Pic" AS v FROM t_banner')),
+		rows(env.DB.prepare('/* site:global */ SELECT "Pic" AS v FROM t_slide')),
+		rows(env.DB.prepare('/* site:global */ SELECT "SmallPic" AS v FROM t_products')),
+		rows(env.DB.prepare('/* site:global */ SELECT "SmallPic" AS v FROM t_news')),
+		rows(env.DB.prepare('/* site:global */ SELECT "PicUrl" AS v FROM t_img')),
+		rows(env.DB.prepare('/* site:global */ SELECT "BigUrl" AS v FROM t_img')),
+		rows(env.DB.prepare('/* site:global */ SELECT "LogoUrl" AS v FROM t_sites')),
+		rows(env.DB.prepare('/* site:global */ SELECT "Content" AS v FROM t_content')),
+	]);
+	return [...banner, ...slide, ...product, ...news, ...gallery, ...big, ...logo, ...content].map((r) => String((r as { v?: unknown }).v ?? ""));
+}
+
+async function scanOrphans(env: AppEnv) {
+	if (!env.IMAGES) return null;
+	const codes = (await rows(env.DB.prepare('/* site:global */ SELECT "Code" AS v FROM t_sites'))).map((r) => String((r as { v?: unknown }).v ?? "").toLowerCase());
+	const texts = await refTexts(env);
+	const objects: { key: string; size: number; uploaded: string }[] = [];
+	let cursor: string | undefined;
+	do {
+		const page = await env.IMAGES.list({ limit: 1000, cursor });
+		for (const o of page.objects) objects.push({ key: o.key, size: Number(o.size ?? 0), uploaded: String(o.uploaded ?? "") });
+		cursor = page.truncated ? page.cursor : undefined;
+	} while (cursor);
+	const isOwned = (key: string) => codes.some((code) => code && key.toLowerCase().startsWith(`${code}/`));
+	const items = objects
+		.filter((o) => !isOwned(o.key))
+		.map((o) => ({
+			...o,
+			// 引用判定用纯子串：和删单图时同一套规则，避免路径写法差异漏判
+			used: texts.some((t) => t.includes(o.key)),
+		}));
+	return { items, total: objects.length };
+}
+
+app.get("/platform/orphans", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const scan = await scanOrphans(c.env);
+	if (!scan) return c.json({ error: "R2 未开通" }, 503);
+	const orphans = scan.items.filter((i) => !i.used);
+	const used = scan.items.length - orphans.length;
+	return c.json({
+		ok: true,
+		total: scan.total,
+		candidates: scan.items.length,
+		orphans: orphans.length,
+		used,
+		size: orphans.reduce((n, i) => n + i.size, 0),
+		items: scan.items.slice(0, 500).sort((a, b) => (a.uploaded < b.uploaded ? 1 : -1)),
+		truncated: scan.items.length > 500,
+	});
+});
+
+app.post("/platform/orphans/purge", async (c) => {
+	if (!isSuper(c.get("admin"))) return deny(c);
+	const env = c.env;
+	if (!env.IMAGES) return c.json({ error: "R2 未开通" }, 503);
+	const b = await c.req.json().catch(() => null);
+	if (!b || String(b.confirm ?? "") !== "DELETE") return c.json({ error: "请传 confirm=DELETE 确认删除" }, 400);
+	const wanted = new Set(Array.isArray(b.keys) ? b.keys.map((k: unknown) => String(k)) : []);
+	const scan = await scanOrphans(env);
+	if (!scan) return c.json({ error: "R2 未开通" }, 503);
+	let deleted = 0;
+	const skipped: string[] = [];
+	for (const item of scan.items) {
+		if (item.used) {
+			skipped.push(item.key);
+			continue;
+		}
+		if (wanted.size && !wanted.has(item.key)) continue;
+		await env.IMAGES.delete(item.key);
+		deleted += 1;
+	}
+	if (deleted) await audit(c, `清理历史图片 ${deleted} 张`);
+	return c.json({ ok: true, deleted, skipped });
+});
+
 export default app;

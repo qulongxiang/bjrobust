@@ -281,6 +281,8 @@ export default function PlatformAdmin() {
 				</div>
 			</div>
 
+			<OrphanPanel onMsg={flash} />
+
 			{mediaSite ? (
 				<MediaPanel
 					site={mediaSite}
@@ -592,6 +594,80 @@ function MediaPanel({
 				onPatch={patchSlide}
 				onDelete={delSlide}
 			/>
+		</div>
+	);
+}
+
+/** 历史图片清理：桶根无站点前缀的老图（旧站遗留/已删站点目录），只列不被任何内容引用的 */
+function OrphanPanel({ onMsg }: { onMsg: (ok: boolean, text: string) => void }) {
+	const [busy, setBusy] = useState(false);
+	const [data, setData] = useState<Awaited<ReturnType<typeof adminApi.platformOrphans>> | null>(null);
+
+	const scan = async () => {
+		setBusy(true);
+		try {
+			setData(await adminApi.platformOrphans());
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "扫描失败");
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const purge = async () => {
+		const n = data?.orphans ?? 0;
+		if (!n) return;
+		if (!window.confirm(`确定删除这 ${n} 张已无引用的历史图片？删除后不可恢复。`)) return;
+		setBusy(true);
+		try {
+			const r = await adminApi.platformPurgeOrphans();
+			onMsg(true, `已删除 ${r.deleted} 张历史图片${r.skipped.length ? `，跳过仍在引用的 ${r.skipped.length} 张` : ""}`);
+			setData(await adminApi.platformOrphans());
+		} catch (e) {
+			onMsg(false, e instanceof Error ? e.message : "删除失败");
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const orphans = data?.items.filter((i) => !i.used) ?? [];
+	const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+	return (
+		<div className="admin-panel" style={{ marginTop: 18 }}>
+			<div className="admin-page-head" style={{ marginBottom: 8 }}>
+				<h3 style={{ margin: 0 }}>历史图片清理</h3>
+			</div>
+			<p className="muted" style={{ marginTop: 0 }}>
+				桶里没有站点前缀的老图（旧 PHP 站遗留、已删站点的目录）不属于任何站点，本站图片库看不到也删不掉。这里只列<b>没有任何内容引用</b>的那些，仍在用的会自动跳过。
+			</p>
+			<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+				<button className="btn" disabled={busy} onClick={scan}>
+					{busy ? "处理中…" : "扫描"}
+				</button>
+				<button className="btn danger" disabled={busy || !orphans.length} onClick={purge}>
+					删除全部无引用老图
+				</button>
+				{data ? (
+					<span className="muted" style={{ fontSize: 12 }}>
+						扫描 {data.total} 张，无站点前缀 {data.candidates} 张，其中无引用 {data.orphans} 张（{kb(data.size)}），仍被引用 {data.used} 张
+					</span>
+				) : null}
+			</div>
+			{orphans.length ? (
+				<div className="orphan-list">
+					{orphans.slice(0, 60).map((i) => (
+						<div className="orphan-item" key={i.key}>
+							<span className="orphan-key">{i.key}</span>
+							<span className="muted">{kb(i.size)}</span>
+							<span className="muted">{i.uploaded ? String(i.uploaded).slice(0, 10) : ""}</span>
+						</div>
+					))}
+					{orphans.length > 60 ? <div className="empty-tip">仅显示前 60 条，删除时按扫描结果全部处理</div> : null}
+				</div>
+			) : data && !data.orphans ? (
+				<div className="empty-tip">没有可清理的历史图片</div>
+			) : null}
 		</div>
 	);
 }

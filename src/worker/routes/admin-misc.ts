@@ -88,8 +88,13 @@ app.put("/global", async (c) => {
 		sets.push(`${col} = ?`);
 	}
 	if (!sets.length) return c.json({ error: "没有要更新的字段" }, 400);
-	params.push(String(siteId));
-	const res = await db.prepare(`UPDATE t_global SET ${sets.join(", ")} WHERE SiteId = ?`).bind(...params).run();
+	params.push(String(siteId), CN, String(siteId), CN);
+	// 必须带 Language：t_global 按 (SiteId, Language) 存多语言行，只按 SiteId 更新会把其他语言的行一起改掉。
+	// 再限定成 MIN(id) 那一行：前台读的就是 ORDER BY id LIMIT 1，历史重复行不该被顺手改。
+	const res = await db
+		.prepare(`UPDATE t_global SET ${sets.join(", ")} WHERE id = (SELECT MIN(id) FROM t_global WHERE SiteId = ? AND Language = ?) AND SiteId = ? AND Language = ?`)
+		.bind(...params)
+		.run();
 	if (!res.meta.changes) return c.json({ error: "站点记录不存在" }, 404);
 	await audit(c, "保存站点全局设置");
 	return c.json({ ok: true });
